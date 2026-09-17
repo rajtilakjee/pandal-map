@@ -1,15 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { FormEvent, useState } from "react";
 import { supabase } from "@/lib/supabase";
+
+type LocationMode = "manual" | "live";
 
 type LocationData = {
   latitude: number;
   longitude: number;
-  accuracy: number;
+  accuracy: number | null;
 };
-
-type LocationMode = "manual" | "live";
 
 type SubmissionState =
   | "ready"
@@ -30,12 +30,7 @@ function isRateLimitError(error: unknown): boolean {
     hint?: string;
   };
 
-  const combined = [
-    err.code,
-    err.message,
-    err.details,
-    err.hint,
-  ]
+  const combined = [err.code, err.message, err.details, err.hint]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
@@ -50,7 +45,7 @@ function isRateLimitError(error: unknown): boolean {
 
 function getErrorMessage(error: unknown): string {
   if (!error || typeof error !== "object") {
-    return "Something went wrong. Please try again.";
+    return "Something went wrong while submitting the pandal.";
   }
 
   const err = error as {
@@ -63,113 +58,57 @@ function getErrorMessage(error: unknown): string {
     err.message ||
     err.details ||
     err.hint ||
-    "Something went wrong. Please try again."
+    "Something went wrong while submitting the pandal."
   );
 }
 
 export default function Home() {
-  const [state, setState] =
-    useState<SubmissionState>("ready");
-
   const [locationMode, setLocationMode] =
     useState<LocationMode>("manual");
 
-  const [location, setLocation] =
-    useState<LocationData | null>(null);
+  const [location, setLocation] = useState<LocationData | null>(null);
 
-  const [pujaName, setPujaName] =
-    useState("");
+  const [pujaName, setPujaName] = useState("");
+  const [locationAddress, setLocationAddress] = useState("");
+  const [area, setArea] = useState("");
+  const [nearestLandmark, setNearestLandmark] = useState("");
 
-  const [locationAddress, setLocationAddress] =
-    useState("");
+  const [state, setState] = useState<SubmissionState>("ready");
+  const [message, setMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const [area, setArea] =
-    useState("");
-
-  const [nearestLandmark, setNearestLandmark] =
-    useState("");
-
-  const [message, setMessage] =
-    useState("");
-
-  const [errorMessage, setErrorMessage] =
-    useState("");
-
-  /*
-   * Switch between manual location and live location.
-   */
-  const handleLocationModeChange = (
-    mode: LocationMode
-  ) => {
-    setLocationMode(mode);
-    setErrorMessage("");
-
-    if (mode === "manual") {
-      /*
-       * Clear GPS data when switching back
-       * to manual location.
-       */
-      setLocation(null);
-      setState("ready");
-      return;
-    }
-
-    /*
-     * Request location only after the user
-     * explicitly chooses live location.
-     */
-    getLiveLocation();
-  };
-
-  /*
-   * Get the user's live location.
-   */
   const getLiveLocation = () => {
-    setState("locating");
-    setErrorMessage("");
-
     if (!navigator.geolocation) {
       setLocationMode("manual");
-      setState("ready");
-
+      setLocation(null);
+      setState("error");
       setErrorMessage(
-        "Your browser does not support location services. You can enter the location manually instead."
+        "Live location is not supported by your browser. You can enter the location manually."
       );
-
       return;
     }
+
+    setState("locating");
+    setMessage("");
+    setErrorMessage("");
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        const locationData: LocationData = {
-          latitude:
-            position.coords.latitude,
+        setLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: Number.isFinite(position.coords.accuracy)
+            ? position.coords.accuracy
+            : null,
+        });
 
-          longitude:
-            position.coords.longitude,
-
-          accuracy:
-            position.coords.accuracy,
-        };
-
-        setLocation(locationData);
         setState("ready");
-        setErrorMessage("");
+        setMessage("Live location added.");
       },
-
       (error) => {
-        console.error(
-          "Location error:",
-          error
-        );
-
-        /*
-         * Fall back to manual location if
-         * the user doesn't provide GPS access.
-         */
         setLocationMode("manual");
         setLocation(null);
-        setState("ready");
+        setState("error");
 
         switch (error.code) {
           case error.PERMISSION_DENIED:
@@ -180,23 +119,22 @@ export default function Home() {
 
           case error.POSITION_UNAVAILABLE:
             setErrorMessage(
-              "Your location could not be determined. You can enter the location manually instead."
+              "Your location could not be determined. Please enter the location manually."
             );
             break;
 
           case error.TIMEOUT:
             setErrorMessage(
-              "Location lookup took too long. You can enter the location manually instead."
+              "Getting your location took too long. Please enter the location manually."
             );
             break;
 
           default:
             setErrorMessage(
-              "Unable to get your location. You can enter the location manually instead."
+              "We couldn't get your location. You can enter it manually."
             );
         }
       },
-
       {
         enableHighAccuracy: false,
         maximumAge: 30000,
@@ -205,1143 +143,759 @@ export default function Home() {
     );
   };
 
-  /*
-   * Submit the Pandal.
-   */
-  const submitPandal = async () => {
-    setErrorMessage("");
+  const handleLocationModeChange = (
+    checked: boolean
+  ) => {
+    if (checked) {
+      setLocationMode("live");
+      getLiveLocation();
+    } else {
+      setLocationMode("manual");
+      setLocation(null);
+      setState("ready");
+      setMessage("");
+      setErrorMessage("");
+    }
+  };
+
+  const reset = () => {
+    setPujaName("");
+    setLocationAddress("");
+    setArea("");
+    setNearestLandmark("");
+
+    setLocation(null);
+    setLocationMode("manual");
+
+    setState("ready");
     setMessage("");
+    setErrorMessage("");
+  };
 
-    const trimmedName =
-      pujaName.trim();
+  const submitPandal = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
 
-    const trimmedAddress =
-      locationAddress.trim();
+    setMessage("");
+    setErrorMessage("");
 
-    const trimmedArea =
-      area.trim();
+    const trimmedName = pujaName.trim();
+    const trimmedAddress = locationAddress.trim();
+    const trimmedArea = area.trim();
+    const trimmedLandmark = nearestLandmark.trim();
 
-    const trimmedLandmark =
-      nearestLandmark.trim();
-
-    /*
-     * Validate Pandal name.
-     */
     if (!trimmedName) {
-      setErrorMessage(
-        "Please enter the Pandal name."
-      );
-
+      setState("error");
+      setErrorMessage("Please enter the pandal name.");
       return;
     }
 
     if (trimmedName.length > 200) {
+      setState("error");
       setErrorMessage(
-        "The Pandal name must be 200 characters or fewer."
+        "Pandal name must be 200 characters or fewer."
       );
-
       return;
     }
 
-    /*
-     * Validate location.
-     */
-    if (locationMode === "live") {
-      if (!location) {
-        setErrorMessage(
-          "Please wait for your live location to be detected."
-        );
+    if (locationMode === "live" && !location) {
+      setState("error");
+      setErrorMessage(
+        "Please allow live location or switch back to manual location."
+      );
+      return;
+    }
 
-        return;
-      }
-    } else {
+    if (locationMode === "manual") {
       if (!trimmedAddress) {
-        setErrorMessage(
-          "Please enter the location or address."
-        );
-
-        return;
-      }
-
-      if (!trimmedArea) {
-        setErrorMessage(
-          "Please enter the area."
-        );
-
+        setState("error");
+        setErrorMessage("Please enter the location or address.");
         return;
       }
 
       if (trimmedAddress.length > 500) {
+        setState("error");
         setErrorMessage(
-          "The location or address must be 500 characters or fewer."
+          "Location or address must be 500 characters or fewer."
         );
+        return;
+      }
 
+      if (!trimmedArea) {
+        setState("error");
+        setErrorMessage("Please enter the area.");
         return;
       }
 
       if (trimmedArea.length > 100) {
+        setState("error");
         setErrorMessage(
-          "The area must be 100 characters or fewer."
+          "Area must be 100 characters or fewer."
         );
-
         return;
       }
     }
 
-    /*
-     * Validate optional landmark.
-     */
     if (trimmedLandmark.length > 200) {
+      setState("error");
       setErrorMessage(
-        "The nearest landmark must be 200 characters or fewer."
+        "Nearest landmark must be 200 characters or fewer."
       );
-
       return;
     }
 
     setState("submitting");
 
-    try {
-      const submission = {
-        puja_name: trimmedName,
+    const submission = {
+      puja_name: trimmedName,
 
-        /*
-         * Live GPS data.
-         *
-         * Manual submissions receive null.
-         */
-        latitude:
-          locationMode === "live"
-            ? location?.latitude
-            : null,
+      latitude:
+        locationMode === "live"
+          ? location?.latitude
+          : null,
 
-        longitude:
-          locationMode === "live"
-            ? location?.longitude
-            : null,
+      longitude:
+        locationMode === "live"
+          ? location?.longitude
+          : null,
 
-        accuracy:
-          locationMode === "live"
-            ? location?.accuracy
-            : null,
+      accuracy:
+        locationMode === "live"
+          ? location?.accuracy
+          : null,
 
-        /*
-         * Manual location data.
-         *
-         * Live submissions receive null.
-         */
-        location_address:
-          locationMode === "manual"
-            ? trimmedAddress
-            : null,
+      location_address:
+        locationMode === "manual"
+          ? trimmedAddress
+          : null,
 
-        area:
-          trimmedArea || null,
+      area: trimmedArea || null,
 
-        nearest_landmark:
-          trimmedLandmark || null,
+      nearest_landmark:
+        trimmedLandmark || null,
 
-        year:
-          new Date().getFullYear(),
-      };
+      year: new Date().getFullYear(),
+    };
 
-      const { error } =
-        await supabase
-          .from("pandal_submissions")
-          .insert(submission);
+    const { error } = await supabase
+      .from("pandal_submissions")
+      .insert(submission);
 
-      if (error) {
-        console.error(
-          "Submission failed:",
-          {
-            code: error.code,
-            message: error.message,
-            details: error.details,
-            hint: error.hint,
-          }
-        );
-
-        /*
-         * Rate limit response.
-         */
-        if (isRateLimitError(error)) {
-          setState("error");
-
-          setErrorMessage(
-            "You've submitted several Pandals recently. Please try again later."
-          );
-
-          return;
-        }
-
-        setState("error");
-
-        setErrorMessage(
-          getErrorMessage(error)
-        );
-
-        return;
-      }
-
-      /*
-       * Successful submission.
-       */
-      setState("success");
-
-      setMessage(
-        "Your Pandal has been added. Thank you for contributing!"
-      );
-
-      /*
-       * Clear the form.
-       */
-      setPujaName("");
-      setLocationAddress("");
-      setArea("");
-      setNearestLandmark("");
-      setLocation(null);
-
-    } catch (error) {
-      console.error(
-        "Unexpected submission error:",
-        error
-      );
-
-      if (isRateLimitError(error)) {
-        setState("error");
-
-        setErrorMessage(
-          "You've submitted several Pandals recently. Please try again later."
-        );
-
-        return;
-      }
+    if (error) {
+      console.error("Pandal submission error:", error);
 
       setState("error");
 
-      setErrorMessage(
-        "Something went wrong while submitting. Please try again."
-      );
+      if (isRateLimitError(error)) {
+        setErrorMessage(
+          "You've reached the submission limit. Please try again later."
+        );
+      } else {
+        setErrorMessage(getErrorMessage(error));
+      }
+
+      return;
     }
-  };
 
-  /*
-   * Reset the form.
-   */
-  const reset = () => {
-    setState("ready");
-    setLocationMode("manual");
-    setLocation(null);
-    setPujaName("");
-    setLocationAddress("");
-    setArea("");
-    setNearestLandmark("");
-    setMessage("");
-    setErrorMessage("");
+    setState("success");
+    setMessage(
+      "Pandal added successfully. Thank you for helping build the map!"
+    );
   };
-
-  const canSubmit =
-    pujaName.trim().length > 0 &&
-    (locationMode === "live"
-      ? location !== null
-      : locationAddress.trim().length > 0 &&
-        area.trim().length > 0);
 
   return (
-    <main className="page">
-
-      <div className="background-decoration decoration-one" />
-
-      <div className="background-decoration decoration-two" />
-
-      <div className="container">
-
+    <main
+      style={{
+        minHeight: "100vh",
+        background: "#F8F3E7",
+        color: "#173B3A",
+        fontFamily:
+          "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "760px",
+          margin: "0 auto",
+          padding: "24px 18px 0",
+          boxSizing: "border-box",
+        }}
+      >
         {/* Header */}
-
-        <header className="header">
-
-          <div className="logo-mark">
-            <span>ॐ</span>
+        <header
+          style={{
+            textAlign: "center",
+            marginBottom: "28px",
+          }}
+        >
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "52px",
+              height: "52px",
+              borderRadius: "50%",
+              background: "#087F7B",
+              color: "#FFFDF7",
+              fontSize: "27px",
+              marginBottom: "12px",
+              boxShadow:
+                "0 8px 24px rgba(8, 127, 123, 0.18)",
+            }}
+          >
+            ॐ
           </div>
 
-          <div>
-
-            <p className="eyebrow">
-              DURGA PUJA • KOLKATA
-            </p>
-
-            <h1>
-              Pandal
-              <span>GO</span>
-            </h1>
-
+          <div
+            style={{
+              fontSize: "11px",
+              fontWeight: 800,
+              letterSpacing: "0.16em",
+              color: "#087F7B",
+              marginBottom: "5px",
+            }}
+          >
+            DURGA PUJA • KOLKATA
           </div>
 
+          <h1
+            style={{
+              margin: 0,
+              fontSize: "clamp(34px, 8vw, 52px)",
+              lineHeight: 1,
+              letterSpacing: "-0.045em",
+              fontWeight: 900,
+              color: "#075E5B",
+            }}
+          >
+            PandalGO
+          </h1>
+
+          <p
+            style={{
+              maxWidth: "520px",
+              margin: "12px auto 0",
+              fontSize: "15px",
+              lineHeight: 1.6,
+              color: "#667674",
+            }}
+          >
+            Help build a living map of Kolkata&apos;s Durga Puja
+            pandals.
+          </p>
         </header>
 
-        <p className="intro">
-          Find a Puja. Share a Puja.
-          <br />
-          Help build the map.
-        </p>
-
         {/* Main Card */}
-
-        <section className="card">
-
-          {/* SUCCESS */}
-
-          {state === "success" && (
-            <div className="success-screen">
-
-              <div className="success-icon">
-                ✓
-              </div>
-
-              <div className="success-label">
-                ADDED TO THE MAP
-              </div>
-
-              <h2>
-                Thank you!
-              </h2>
-
-              <p>
-                {message}
-              </p>
-
-              <button
-                className="primary-button"
-                onClick={reset}
-              >
-                Add another Pandal
-              </button>
-
+        <section
+          style={{
+            background: "#FFFDF7",
+            border: "1px solid #D8E2DC",
+            borderRadius: "24px",
+            padding: "clamp(20px, 5vw, 34px)",
+            boxShadow:
+              "0 16px 50px rgba(23, 59, 58, 0.07)",
+          }}
+        >
+          <div style={{ marginBottom: "26px" }}>
+            <div
+              style={{
+                fontSize: "12px",
+                fontWeight: 800,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                color: "#087F7B",
+                marginBottom: "7px",
+              }}
+            >
+              Add a Pandal
             </div>
-          )}
 
-          {/* ERROR */}
+            <h2
+              style={{
+                margin: 0,
+                fontSize: "25px",
+                lineHeight: 1.2,
+                letterSpacing: "-0.02em",
+              }}
+            >
+              Know a Puja that&apos;s missing?
+            </h2>
 
-          {state === "error" && (
-            <div className="error-screen">
+            <p
+              style={{
+                margin: "8px 0 0",
+                color: "#667674",
+                fontSize: "14px",
+                lineHeight: 1.55,
+              }}
+            >
+              Add its details and help someone discover it.
+            </p>
+          </div>
 
-              <div className="error-icon">
-                !
-              </div>
-
-              <h2>
-                Something went wrong
-              </h2>
-
-              <p>
-                {errorMessage}
-              </p>
-
-              <button
-                className="primary-button"
-                onClick={reset}
+          <form onSubmit={submitPandal}>
+            {/* Pandal Name */}
+            <div style={{ marginBottom: "22px" }}>
+              <label
+                htmlFor="puja-name"
+                style={{
+                  display: "block",
+                  fontSize: "13px",
+                  fontWeight: 800,
+                  marginBottom: "8px",
+                }}
               >
-                Try again
-              </button>
-
-            </div>
-          )}
-
-          {/* FORM */}
-
-          {state !== "success" &&
-            state !== "error" && (
-
-            <div className="form-screen">
-
-              {/* PANDAL NAME */}
-
-              <div className="form-group">
-
-                <label htmlFor="puja-name">
-                  Pandal Name
-                  <span className="required">
-                    *
-                  </span>
-                </label>
-
-                <input
-                  id="puja-name"
-                  type="text"
-                  value={pujaName}
-                  onChange={(event) => {
-                    setPujaName(
-                      event.target.value
-                    );
-
-                    setErrorMessage("");
-                  }}
-                  placeholder="e.g. Barisha Club"
-                  maxLength={200}
-                  autoComplete="off"
-                />
-
-              </div>
-
-              {/* LOCATION */}
-
-              <div className="location-section">
-
-                <label className="section-label">
-                  Location
-                  <span className="required">
-                    *
-                  </span>
-                </label>
-
-                {/* LIVE LOCATION CHECKBOX */}
-
-                <label
-                  className={`live-location-option ${
-                    locationMode === "live"
-                      ? "active"
-                      : ""
-                  }`}
-                >
-
-                  <input
-                    type="checkbox"
-                    checked={
-                      locationMode === "live"
-                    }
-                    onChange={(event) => {
-                      handleLocationModeChange(
-                        event.target.checked
-                          ? "live"
-                          : "manual"
-                      );
-                    }}
-                  />
-
-                  <span className="custom-checkbox">
-                    {locationMode === "live" &&
-                      "✓"}
-                  </span>
-
-                  <span className="live-location-text">
-
-                    <strong>
-                      Add live location
-                    </strong>
-
-                    <small>
-                      Uses your device&apos;s
-                      current location
-                    </small>
-
-                  </span>
-
-                </label>
-
-                {/* GETTING LOCATION */}
-
-                {locationMode === "live" &&
-                  state === "locating" && (
-
-                  <div className="location-status">
-
-                    <div className="small-spinner" />
-
-                    <span>
-                      Getting your location...
-                    </span>
-
-                  </div>
-                )}
-
-                {/* LOCATION FOUND */}
-
-                {locationMode === "live" &&
-                  location &&
-                  state !== "locating" && (
-
-                  <div className="location-success">
-
-                    <span>
-                      ✓
-                    </span>
-
-                    <div>
-
-                      <strong>
-                        Live location added
-                      </strong>
-
-                      <small>
-                        Accuracy: approximately{" "}
-                        {Math.round(
-                          location.accuracy
-                        )}
-                        m
-                      </small>
-
-                    </div>
-
-                  </div>
-                )}
-
-                {/* MANUAL LOCATION */}
-
-                {locationMode === "manual" && (
-
-                  <div className="manual-location">
-
-                    {/* ADDRESS */}
-
-                    <div className="form-group">
-
-                      <label htmlFor="location-address">
-                        Location / Address
-                        <span className="required">
-                          *
-                        </span>
-                      </label>
-
-                      <textarea
-                        id="location-address"
-                        value={
-                          locationAddress
-                        }
-                        onChange={(event) => {
-                          setLocationAddress(
-                            event.target.value
-                          );
-
-                          setErrorMessage("");
-                        }}
-                        placeholder="e.g. 123, Diamond Harbour Road"
-                        maxLength={500}
-                        rows={3}
-                      />
-
-                      <div className="character-count textarea-count">
-                        {
-                          locationAddress.length
-                        }
-                        /500
-                      </div>
-
-                    </div>
-
-                    {/* AREA */}
-
-                    <div className="form-group">
-
-                      <label htmlFor="area">
-                        Area
-                        <span className="required">
-                          *
-                        </span>
-                      </label>
-
-                      <input
-                        id="area"
-                        type="text"
-                        value={area}
-                        onChange={(event) => {
-                          setArea(
-                            event.target.value
-                          );
-
-                          setErrorMessage("");
-                        }}
-                        placeholder="e.g. Barisha"
-                        maxLength={100}
-                        autoComplete="off"
-                      />
-
-                    </div>
-
-                  </div>
-                )}
-
-              </div>
-
-              {/* NEAREST LANDMARK */}
-
-              <div className="form-group">
-
-                <label htmlFor="landmark">
-
-                  Nearest Landmark
-
-                  <span className="optional">
-                    optional
-                  </span>
-
-                </label>
-
-                <input
-                  id="landmark"
-                  type="text"
-                  value={nearestLandmark}
-                  onChange={(event) => {
-                    setNearestLandmark(
-                      event.target.value
-                    );
-
-                    setErrorMessage("");
-                  }}
-                  placeholder="e.g. Near Deshapriya Park"
-                  maxLength={200}
-                  autoComplete="off"
-                />
-
-              </div>
-
-              {/* ERROR */}
-
-              {errorMessage && (
-
-                <div className="inline-error">
-                  {errorMessage}
-                </div>
-
-              )}
-
-              {/* SUBMIT */}
-
-              <button
-                className="primary-button"
-                onClick={submitPandal}
+                Pandal Name
+                <span style={{ color: "#087F7B" }}> *</span>
+              </label>
+
+              <input
+                id="puja-name"
+                type="text"
+                value={pujaName}
+                onChange={(event) =>
+                  setPujaName(event.target.value)
+                }
+                placeholder="e.g. Barisha Club"
+                maxLength={200}
                 disabled={
-                  !canSubmit ||
+                  state === "locating" ||
                   state === "submitting"
                 }
-              >
-                {state === "submitting"
-                  ? "Adding Pandal..."
-                  : "Submit Pandal"}
-              </button>
-
-              {/* PRIVACY */}
-
-              <p className="privacy-note">
-                Live location is optional.
-                You can enter the location
-                manually instead.
-              </p>
-
+                style={{
+                  width: "100%",
+                  boxSizing: "border-box",
+                  border: "1px solid #D8E2DC",
+                  borderRadius: "12px",
+                  padding: "13px 14px",
+                  background: "#FFFFFF",
+                  color: "#173B3A",
+                  fontSize: "14px",
+                  outline: "none",
+                }}
+              />
             </div>
-          )}
 
+            {/* Location */}
+            <div style={{ marginBottom: "22px" }}>
+              <div
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 800,
+                  marginBottom: "10px",
+                }}
+              >
+                Location
+                <span style={{ color: "#087F7B" }}> *</span>
+              </div>
+
+              {/* Live Location Toggle */}
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "11px",
+                  padding: "13px 14px",
+                  borderRadius: "12px",
+                  background: "#D9EFEC",
+                  border: "1px solid #C4E3DF",
+                  cursor:
+                    state === "submitting"
+                      ? "not-allowed"
+                      : "pointer",
+                  marginBottom: "14px",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={locationMode === "live"}
+                  onChange={(event) =>
+                    handleLocationModeChange(
+                      event.target.checked
+                    )
+                  }
+                  disabled={state === "submitting"}
+                  style={{
+                    width: "17px",
+                    height: "17px",
+                    accentColor: "#087F7B",
+                    cursor: "pointer",
+                  }}
+                />
+
+                <div>
+                  <div
+                    style={{
+                      fontSize: "14px",
+                      fontWeight: 800,
+                    }}
+                  >
+                    Add live location
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: "12px",
+                      color: "#667674",
+                      marginTop: "2px",
+                    }}
+                  >
+                    Use your current GPS location
+                  </div>
+                </div>
+              </label>
+
+              {/* Live Location Status */}
+              {locationMode === "live" &&
+                state === "locating" && (
+                  <div
+                    style={{
+                      padding: "13px 14px",
+                      borderRadius: "12px",
+                      background: "#F8F3E7",
+                      color: "#667674",
+                      fontSize: "13px",
+                      marginBottom: "14px",
+                    }}
+                  >
+                    Getting your location...
+                  </div>
+                )}
+
+              {locationMode === "live" &&
+                location &&
+                state !== "locating" && (
+                  <div
+                    style={{
+                      padding: "13px 14px",
+                      borderRadius: "12px",
+                      background: "#F0F8F6",
+                      border: "1px solid #CDE5E1",
+                      color: "#075E5B",
+                      fontSize: "13px",
+                      marginBottom: "14px",
+                    }}
+                  >
+                    Live location added successfully.
+                  </div>
+                )}
+
+              {/* Manual Location Fields */}
+              {locationMode === "manual" && (
+                <>
+                  <div style={{ marginBottom: "14px" }}>
+                    <label
+                      htmlFor="location-address"
+                      style={{
+                        display: "block",
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        marginBottom: "8px",
+                      }}
+                    >
+                      Location / Address
+                      <span style={{ color: "#087F7B" }}>
+                        {" "}
+                        *
+                      </span>
+                    </label>
+
+                    <textarea
+                      id="location-address"
+                      value={locationAddress}
+                      onChange={(event) =>
+                        setLocationAddress(
+                          event.target.value
+                        )
+                      }
+                      placeholder="e.g. 123 Diamond Harbour Road"
+                      maxLength={500}
+                      rows={3}
+                      disabled={state === "submitting"}
+                      style={{
+                        width: "100%",
+                        boxSizing: "border-box",
+                        border: "1px solid #D8E2DC",
+                        borderRadius: "12px",
+                        padding: "13px 14px",
+                        background: "#FFFFFF",
+                        color: "#173B3A",
+                        fontSize: "14px",
+                        lineHeight: 1.5,
+                        resize: "vertical",
+                        outline: "none",
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: "14px" }}>
+                    <label
+                      htmlFor="area"
+                      style={{
+                        display: "block",
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        marginBottom: "8px",
+                      }}
+                    >
+                      Area
+                      <span style={{ color: "#087F7B" }}>
+                        {" "}
+                        *
+                      </span>
+                    </label>
+
+                    <input
+                      id="area"
+                      type="text"
+                      value={area}
+                      onChange={(event) =>
+                        setArea(event.target.value)
+                      }
+                      placeholder="e.g. Barisha"
+                      maxLength={100}
+                      disabled={state === "submitting"}
+                      style={{
+                        width: "100%",
+                        boxSizing: "border-box",
+                        border: "1px solid #D8E2DC",
+                        borderRadius: "12px",
+                        padding: "13px 14px",
+                        background: "#FFFFFF",
+                        color: "#173B3A",
+                        fontSize: "14px",
+                        outline: "none",
+                      }}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Nearest Landmark */}
+              <div>
+                <label
+                  htmlFor="nearest-landmark"
+                  style={{
+                    display: "block",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    marginBottom: "8px",
+                  }}
+                >
+                  Nearest Landmark
+                  <span
+                    style={{
+                      fontWeight: 500,
+                      color: "#667674",
+                    }}
+                  >
+                    {" "}
+                    (optional)
+                  </span>
+                </label>
+
+                <input
+                  id="nearest-landmark"
+                  type="text"
+                  value={nearestLandmark}
+                  onChange={(event) =>
+                    setNearestLandmark(event.target.value)
+                  }
+                  placeholder="e.g. Near Barisha High School"
+                  maxLength={200}
+                  disabled={state === "submitting"}
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    border: "1px solid #D8E2DC",
+                    borderRadius: "12px",
+                    padding: "13px 14px",
+                    background: "#FFFFFF",
+                    color: "#173B3A",
+                    fontSize: "14px",
+                    outline: "none",
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Privacy Note */}
+            <div
+              style={{
+                display: "flex",
+                gap: "9px",
+                alignItems: "flex-start",
+                padding: "12px 13px",
+                borderRadius: "12px",
+                background: "#F8F3E7",
+                color: "#667674",
+                fontSize: "12px",
+                lineHeight: 1.5,
+                marginBottom: "20px",
+              }}
+            >
+              <span
+                style={{
+                  color: "#087F7B",
+                  fontWeight: 800,
+                  flexShrink: 0,
+                }}
+              >
+                ●
+              </span>
+
+              <span>
+                Live location is optional. You can enter the
+                location manually instead.
+              </span>
+            </div>
+
+            {/* Error */}
+            {state === "error" && errorMessage && (
+              <div
+                role="alert"
+                style={{
+                  padding: "13px 14px",
+                  borderRadius: "12px",
+                  background: "#FFF1EF",
+                  border: "1px solid #F0D0CA",
+                  color: "#9A3E31",
+                  fontSize: "13px",
+                  lineHeight: 1.5,
+                  marginBottom: "16px",
+                }}
+              >
+                {errorMessage}
+              </div>
+            )}
+
+            {/* Success */}
+            {state === "success" && message && (
+              <div
+                role="status"
+                style={{
+                  padding: "14px",
+                  borderRadius: "12px",
+                  background: "#EAF7F3",
+                  border: "1px solid #C5E5DD",
+                  color: "#075E5B",
+                  fontSize: "13px",
+                  lineHeight: 1.5,
+                  marginBottom: "16px",
+                }}
+              >
+                {message}
+              </div>
+            )}
+
+            {/* General Message */}
+            {state !== "success" &&
+              state !== "error" &&
+              message && (
+                <div
+                  style={{
+                    padding: "13px 14px",
+                    borderRadius: "12px",
+                    background: "#F0F8F6",
+                    color: "#075E5B",
+                    fontSize: "13px",
+                    marginBottom: "16px",
+                  }}
+                >
+                  {message}
+                </div>
+              )}
+
+            {/* Submit */}
+            {state === "success" ? (
+              <button
+                type="button"
+                onClick={reset}
+                style={{
+                  width: "100%",
+                  border: "none",
+                  borderRadius: "13px",
+                  padding: "14px 18px",
+                  background: "#087F7B",
+                  color: "#FFFFFF",
+                  fontSize: "14px",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  boxShadow:
+                    "0 8px 20px rgba(8, 127, 123, 0.18)",
+                }}
+              >
+                Add Another Pandal
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={
+                  state === "locating" ||
+                  state === "submitting"
+                }
+                style={{
+                  width: "100%",
+                  border: "none",
+                  borderRadius: "13px",
+                  padding: "14px 18px",
+                  background:
+                    state === "locating" ||
+                    state === "submitting"
+                      ? "#A8C8C5"
+                      : "#087F7B",
+                  color: "#FFFFFF",
+                  fontSize: "14px",
+                  fontWeight: 800,
+                  cursor:
+                    state === "locating" ||
+                    state === "submitting"
+                      ? "not-allowed"
+                      : "pointer",
+                  boxShadow:
+                    state === "locating" ||
+                    state === "submitting"
+                      ? "none"
+                      : "0 8px 20px rgba(8, 127, 123, 0.18)",
+                }}
+              >
+                {state === "locating"
+                  ? "Getting Location..."
+                  : state === "submitting"
+                    ? "Adding Pandal..."
+                    : "Add Pandal"}
+              </button>
+            )}
+          </form>
         </section>
 
-        {/* FOOTER */}
+        {/* Footer */}
+        <footer
+          style={{
+            marginTop: "30px",
+            padding: "18px 16px 28px",
+            textAlign: "center",
+            color: "#667674",
+            fontSize: "13px",
+          }}
+        >
+          <span>Built by </span>
 
-        <footer>
-
-          <span>
-            Made for the Puja season
-          </span>
-
-          <span className="footer-dot">
-            •
-          </span>
-
-          <span>
-            One Pandal at a time
-          </span>
-
+          <a
+            href="https://x.com/rajtilakjee"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              color: "#087F7B",
+              fontWeight: 800,
+              textDecoration: "none",
+            }}
+          >
+            @rajtilakjee
+          </a>
         </footer>
-
       </div>
-
-      <style jsx>{`
-
-        .page {
-          min-height: 100vh;
-          background: #f8f3e7;
-          color: #173b3a;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          padding: 40px 20px;
-          box-sizing: border-box;
-          position: relative;
-          overflow: hidden;
-          font-family:
-            Inter,
-            -apple-system,
-            BlinkMacSystemFont,
-            "Segoe UI",
-            sans-serif;
-        }
-
-        .container {
-          width: 100%;
-          max-width: 520px;
-          position: relative;
-          z-index: 2;
-        }
-
-        .background-decoration {
-          position: fixed;
-          border-radius: 999px;
-          pointer-events: none;
-          z-index: 0;
-        }
-
-        .decoration-one {
-          width: 420px;
-          height: 420px;
-          background: #d9efec;
-          opacity: 0.65;
-          top: -180px;
-          right: -160px;
-        }
-
-        .decoration-two {
-          width: 300px;
-          height: 300px;
-          background: #efd9a7;
-          opacity: 0.35;
-          bottom: -150px;
-          left: -130px;
-        }
-
-        .header {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-          margin-bottom: 18px;
-        }
-
-        .logo-mark {
-          width: 52px;
-          height: 52px;
-          background: #087f7b;
-          color: #fffdf7;
-          border-radius: 16px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 26px;
-          box-shadow:
-            0 8px 24px
-            rgba(8, 127, 123, 0.2);
-        }
-
-        .eyebrow {
-          font-size: 10px;
-          font-weight: 800;
-          letter-spacing: 0.15em;
-          color: #087f7b;
-          margin: 0 0 3px;
-        }
-
-        h1 {
-          margin: 0;
-          font-size: 30px;
-          line-height: 1;
-          letter-spacing: -0.04em;
-          font-weight: 800;
-        }
-
-        h1 span {
-          color: #087f7b;
-        }
-
-        .intro {
-          color: #667674;
-          font-size: 15px;
-          line-height: 1.55;
-          margin: 0 0 24px 66px;
-        }
-
-        .card {
-          background: #fffdf7;
-          border: 1px solid #d8e2dc;
-          border-radius: 24px;
-          padding: 30px;
-          box-shadow:
-            0 20px 60px
-            rgba(23, 59, 58, 0.08);
-        }
-
-        .form-group {
-          position: relative;
-          margin-bottom: 20px;
-        }
-
-        .form-group label,
-        .section-label {
-          display: block;
-          font-size: 13px;
-          font-weight: 700;
-          margin-bottom: 9px;
-        }
-
-        .required {
-          color: #087f7b;
-          margin-left: 3px;
-        }
-
-        .optional {
-          color: #8a9693;
-          font-size: 10px;
-          font-weight: 500;
-          margin-left: 7px;
-        }
-
-        .form-group input,
-        .form-group textarea {
-          width: 100%;
-          box-sizing: border-box;
-          border: 1px solid #cbd9d5;
-          border-radius: 13px;
-          background: #fffdf7;
-          color: #173b3a;
-          font-size: 15px;
-          outline: none;
-          transition:
-            border 0.2s ease,
-            box-shadow 0.2s ease;
-          font-family: inherit;
-        }
-
-        .form-group input {
-          padding: 14px 15px;
-        }
-
-        .form-group textarea {
-          padding: 14px 15px;
-          resize: vertical;
-          min-height: 85px;
-          line-height: 1.5;
-        }
-
-        .form-group input::placeholder,
-        .form-group textarea::placeholder {
-          color: #9aa8a5;
-        }
-
-        .form-group input:focus,
-        .form-group textarea:focus {
-          border-color: #087f7b;
-          box-shadow:
-            0 0 0 3px
-            rgba(8, 127, 123, 0.1);
-        }
-
-        .character-count {
-          position: absolute;
-          right: 12px;
-          bottom: 14px;
-          color: #91a09d;
-          font-size: 10px;
-        }
-
-        .textarea-count {
-          bottom: 12px;
-        }
-
-        .location-section {
-          margin-bottom: 20px;
-        }
-
-        .live-location-option {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 15px;
-          border: 1px solid #cbd9d5;
-          border-radius: 14px;
-          cursor: pointer;
-          transition:
-            border 0.2s ease,
-            background 0.2s ease;
-          margin-bottom: 14px;
-        }
-
-        .live-location-option:hover {
-          border-color: #087f7b;
-        }
-
-        .live-location-option.active {
-          background: #d9efec;
-          border-color: #087f7b;
-        }
-
-        .live-location-option input {
-          position: absolute;
-          opacity: 0;
-          pointer-events: none;
-        }
-
-        .custom-checkbox {
-          width: 21px;
-          height: 21px;
-          border: 2px solid #9bbdb9;
-          border-radius: 6px;
-          background: #fffdf7;
-          color: #fffdf7;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-          font-size: 13px;
-          font-weight: 800;
-        }
-
-        .live-location-option.active
-          .custom-checkbox {
-          background: #087f7b;
-          border-color: #087f7b;
-        }
-
-        .live-location-text {
-          display: flex;
-          flex-direction: column;
-          gap: 3px;
-        }
-
-        .live-location-text strong {
-          font-size: 14px;
-        }
-
-        .live-location-text small {
-          color: #667674;
-          font-size: 11px;
-        }
-
-        .manual-location {
-          animation: fadeIn 0.2s ease;
-        }
-
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(-4px);
-          }
-
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        .location-status {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 14px;
-          border-radius: 13px;
-          background: #f0f7f5;
-          color: #4e6967;
-          font-size: 13px;
-          margin-bottom: 14px;
-        }
-
-        .small-spinner {
-          width: 17px;
-          height: 17px;
-          border: 2px solid #b8ded9;
-          border-top-color: #087f7b;
-          border-radius: 50%;
-          animation: spin 0.8s linear infinite;
-          flex-shrink: 0;
-        }
-
-        @keyframes spin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-
-        .location-success {
-          display: flex;
-          align-items: center;
-          gap: 11px;
-          padding: 14px;
-          border-radius: 13px;
-          background: #d9efec;
-          color: #075e5b;
-          margin-bottom: 14px;
-        }
-
-        .location-success > span {
-          width: 27px;
-          height: 27px;
-          border-radius: 50%;
-          background: #087f7b;
-          color: #fffdf7;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: 800;
-        }
-
-        .location-success div {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-        }
-
-        .location-success small {
-          color: #4e6967;
-          font-size: 11px;
-        }
-
-        .primary-button {
-          width: 100%;
-          border: 0;
-          border-radius: 14px;
-          background: #087f7b;
-          color: #fffdf7;
-          padding: 15px 20px;
-          font-size: 15px;
-          font-weight: 700;
-          cursor: pointer;
-          transition:
-            background 0.2s ease,
-            transform 0.2s ease,
-            box-shadow 0.2s ease;
-          box-shadow:
-            0 8px 20px
-            rgba(8, 127, 123, 0.18);
-        }
-
-        .primary-button:hover:not(:disabled) {
-          background: #075e5b;
-          transform: translateY(-1px);
-          box-shadow:
-            0 10px 24px
-            rgba(8, 127, 123, 0.24);
-        }
-
-        .primary-button:active:not(:disabled) {
-          transform: translateY(0);
-        }
-
-        .primary-button:disabled {
-          opacity: 0.45;
-          cursor: not-allowed;
-          box-shadow: none;
-        }
-
-        .inline-error {
-          background: #f9ead1;
-          border: 1px solid #ead2a5;
-          color: #765f2b;
-          border-radius: 12px;
-          padding: 12px 14px;
-          font-size: 13px;
-          line-height: 1.45;
-          margin-bottom: 14px;
-        }
-
-        .privacy-note {
-          text-align: center;
-          font-size: 11px;
-          color: #8a9693;
-          line-height: 1.5;
-          margin: 14px 0 0;
-        }
-
-        .success-screen,
-        .error-screen {
-          text-align: center;
-        }
-
-        .success-icon {
-          width: 64px;
-          height: 64px;
-          margin: 0 auto 18px;
-          border-radius: 50%;
-          background: #087f7b;
-          color: #fffdf7;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 30px;
-          font-weight: 700;
-          box-shadow:
-            0 10px 25px
-            rgba(8, 127, 123, 0.2);
-        }
-
-        .success-label {
-          color: #087f7b;
-          font-size: 10px;
-          font-weight: 800;
-          letter-spacing: 0.14em;
-          margin-bottom: 9px;
-        }
-
-        .success-screen h2,
-        .error-screen h2 {
-          margin: 0 0 10px;
-          font-size: 24px;
-        }
-
-        .success-screen p,
-        .error-screen p {
-          color: #667674;
-          font-size: 14px;
-          line-height: 1.6;
-          margin: 0 auto 24px;
-          max-width: 370px;
-        }
-
-        .error-icon {
-          width: 56px;
-          height: 56px;
-          margin: 0 auto 18px;
-          border-radius: 50%;
-          background: #efd9a7;
-          color: #765f2b;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 25px;
-          font-weight: 800;
-        }
-
-        footer {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          gap: 9px;
-          margin-top: 22px;
-          color: #87938f;
-          font-size: 11px;
-        }
-
-        .footer-dot {
-          color: #087f7b;
-        }
-
-        @media (max-width: 520px) {
-
-          .page {
-            padding: 24px 15px;
-            align-items: flex-start;
-            padding-top: 35px;
-          }
-
-          .card {
-            padding: 24px 20px;
-            border-radius: 20px;
-          }
-
-          h1 {
-            font-size: 27px;
-          }
-
-          .intro {
-            margin-left: 0;
-          }
-
-        }
-
-      `}</style>
-
     </main>
   );
 }
