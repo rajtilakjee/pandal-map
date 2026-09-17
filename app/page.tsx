@@ -472,18 +472,6 @@ export default function Home() {
         >
           <form onSubmit={submitPandal}>
             {/* ========================================
-                SEPARATOR BEFORE PANDAL NAME
-            ======================================== */}
-
-            <div
-              style={{
-                height: "1px",
-                background: "#D8E2DC",
-                marginBottom: "26px",
-              }}
-            />
-
-            {/* ========================================
                 PANDAL NAME
             ======================================== */}
 
