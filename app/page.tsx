@@ -18,6 +18,13 @@ type SubmissionState =
   | "success"
   | "error";
 
+const AREA_OPTIONS = [
+  "North Kolkata",
+  "South Kolkata",
+  "Central Kolkata",
+  "Salt Lake",
+];
+
 function isRateLimitError(error: unknown): boolean {
   if (!error || typeof error !== "object") {
     return false;
@@ -66,14 +73,18 @@ export default function Home() {
   const [locationMode, setLocationMode] =
     useState<LocationMode>("manual");
 
-  const [location, setLocation] = useState<LocationData | null>(null);
+  const [location, setLocation] =
+    useState<LocationData | null>(null);
 
   const [pujaName, setPujaName] = useState("");
   const [locationAddress, setLocationAddress] = useState("");
   const [area, setArea] = useState("");
-  const [nearestLandmark, setNearestLandmark] = useState("");
+  const [nearestLandmark, setNearestLandmark] =
+    useState("");
 
-  const [state, setState] = useState<SubmissionState>("ready");
+  const [state, setState] =
+    useState<SubmissionState>("ready");
+
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -82,9 +93,11 @@ export default function Home() {
       setLocationMode("manual");
       setLocation(null);
       setState("error");
+
       setErrorMessage(
         "Live location is not supported by your browser. You can enter the location manually."
       );
+
       return;
     }
 
@@ -97,7 +110,9 @@ export default function Home() {
         setLocation({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
-          accuracy: Number.isFinite(position.coords.accuracy)
+          accuracy: Number.isFinite(
+            position.coords.accuracy
+          )
             ? position.coords.accuracy
             : null,
         });
@@ -105,6 +120,7 @@ export default function Home() {
         setState("ready");
         setMessage("Live location added.");
       },
+
       (error) => {
         setLocationMode("manual");
         setLocation(null);
@@ -135,6 +151,7 @@ export default function Home() {
             );
         }
       },
+
       {
         enableHighAccuracy: false,
         maximumAge: 30000,
@@ -172,7 +189,9 @@ export default function Home() {
     setErrorMessage("");
   };
 
-  const submitPandal = async (event: FormEvent<HTMLFormElement>) => {
+  const submitPandal = async (
+    event: FormEvent<HTMLFormElement>
+  ) => {
     event.preventDefault();
 
     setMessage("");
@@ -181,11 +200,14 @@ export default function Home() {
     const trimmedName = pujaName.trim();
     const trimmedAddress = locationAddress.trim();
     const trimmedArea = area.trim();
-    const trimmedLandmark = nearestLandmark.trim();
+    const trimmedLandmark =
+      nearestLandmark.trim();
 
     if (!trimmedName) {
       setState("error");
-      setErrorMessage("Please enter the pandal name.");
+      setErrorMessage(
+        "Please enter the pandal name."
+      );
       return;
     }
 
@@ -197,7 +219,10 @@ export default function Home() {
       return;
     }
 
-    if (locationMode === "live" && !location) {
+    if (
+      locationMode === "live" &&
+      !location
+    ) {
       setState("error");
       setErrorMessage(
         "Please allow live location or switch back to manual location."
@@ -208,7 +233,9 @@ export default function Home() {
     if (locationMode === "manual") {
       if (!trimmedAddress) {
         setState("error");
-        setErrorMessage("Please enter the location or address.");
+        setErrorMessage(
+          "Please enter the location or address."
+        );
         return;
       }
 
@@ -222,14 +249,8 @@ export default function Home() {
 
       if (!trimmedArea) {
         setState("error");
-        setErrorMessage("Please enter the area.");
-        return;
-      }
-
-      if (trimmedArea.length > 100) {
-        setState("error");
         setErrorMessage(
-          "Area must be 100 characters or fewer."
+          "Please select an area."
         );
         return;
       }
@@ -281,7 +302,10 @@ export default function Home() {
       .insert(submission);
 
     if (error) {
-      console.error("Pandal submission error:", error);
+      console.error(
+        "Pandal submission error:",
+        error
+      );
 
       setState("error");
 
@@ -290,13 +314,16 @@ export default function Home() {
           "You've reached the submission limit. Please try again later."
         );
       } else {
-        setErrorMessage(getErrorMessage(error));
+        setErrorMessage(
+          getErrorMessage(error)
+        );
       }
 
       return;
     }
 
     setState("success");
+
     setMessage(
       "Pandal added successfully. Thank you for helping build the map!"
     );
@@ -362,7 +389,8 @@ export default function Home() {
           <h1
             style={{
               margin: 0,
-              fontSize: "clamp(34px, 8vw, 52px)",
+              fontSize:
+                "clamp(34px, 8vw, 52px)",
               lineHeight: 1,
               letterSpacing: "-0.045em",
               fontWeight: 900,
@@ -381,8 +409,8 @@ export default function Home() {
               color: "#667674",
             }}
           >
-            Help build a living map of Kolkata&apos;s Durga Puja
-            pandals.
+            Help build a living map of
+            Kolkata&apos;s Durga Puja pandals.
           </p>
         </header>
 
@@ -392,81 +420,399 @@ export default function Home() {
             background: "#FFFDF7",
             border: "1px solid #D8E2DC",
             borderRadius: "24px",
-            padding: "clamp(20px, 5vw, 34px)",
+            padding:
+              "clamp(20px, 5vw, 34px)",
             boxShadow:
               "0 16px 50px rgba(23, 59, 58, 0.07)",
           }}
         >
-          <div style={{ marginBottom: "26px" }}>
-            <div
+          {/* Separator before Pandal Name */}
+          <div
+            style={{
+              height: "1px",
+              background: "#D8E2DC",
+              marginBottom: "26px",
+            }}
+          />
+
+          {/* Pandal Name */}
+          <div style={{ marginBottom: "22px" }}>
+            <label
+              htmlFor="puja-name"
               style={{
-                fontSize: "12px",
+                display: "block",
+                fontSize: "13px",
                 fontWeight: 800,
-                letterSpacing: "0.12em",
-                textTransform: "uppercase",
-                color: "#087F7B",
-                marginBottom: "7px",
+                marginBottom: "8px",
               }}
             >
-              Add a Pandal
-            </div>
+              Pandal Name
+              <span style={{ color: "#087F7B" }}>
+                {" "}
+                *
+              </span>
+            </label>
 
-            <h2
+            <input
+              id="puja-name"
+              type="text"
+              value={pujaName}
+              onChange={(event) =>
+                setPujaName(
+                  event.target.value
+                )
+              }
+              placeholder="e.g. Barisha Club"
+              maxLength={200}
+              disabled={
+                state === "locating" ||
+                state === "submitting"
+              }
               style={{
-                margin: 0,
-                fontSize: "25px",
-                lineHeight: 1.2,
-                letterSpacing: "-0.02em",
-              }}
-            >
-              Know a Puja that&apos;s missing?
-            </h2>
-
-            <p
-              style={{
-                margin: "8px 0 0",
-                color: "#667674",
+                width: "100%",
+                boxSizing: "border-box",
+                border:
+                  "1px solid #D8E2DC",
+                borderRadius: "12px",
+                padding: "13px 14px",
+                background: "#FFFFFF",
+                color: "#173B3A",
                 fontSize: "14px",
-                lineHeight: 1.55,
+                outline: "none",
               }}
-            >
-              Add its details and help someone discover it.
-            </p>
+            />
           </div>
 
-          <form onSubmit={submitPandal}>
-            {/* Pandal Name */}
-            <div style={{ marginBottom: "22px" }}>
+          {/* Location */}
+          <div style={{ marginBottom: "22px" }}>
+            <div
+              style={{
+                fontSize: "13px",
+                fontWeight: 800,
+                marginBottom: "10px",
+              }}
+            >
+              Location
+              <span style={{ color: "#087F7B" }}>
+                {" "}
+                *
+              </span>
+            </div>
+
+            {/* Live Location */}
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "11px",
+                padding: "13px 14px",
+                borderRadius: "12px",
+                background: "#D9EFEC",
+                border:
+                  "1px solid #C4E3DF",
+                cursor:
+                  state === "submitting"
+                    ? "not-allowed"
+                    : "pointer",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={
+                  locationMode === "live"
+                }
+                onChange={(event) =>
+                  handleLocationModeChange(
+                    event.target.checked
+                  )
+                }
+                disabled={
+                  state === "submitting"
+                }
+                style={{
+                  width: "17px",
+                  height: "17px",
+                  accentColor: "#087F7B",
+                  cursor: "pointer",
+                }}
+              />
+
+              <div>
+                <div
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: 800,
+                  }}
+                >
+                  Add live location
+                </div>
+
+                <div
+                  style={{
+                    fontSize: "12px",
+                    color: "#667674",
+                    marginTop: "2px",
+                  }}
+                >
+                  Use your current GPS location
+                </div>
+              </div>
+            </label>
+
+            {/* OR Separator */}
+            {locationMode === "manual" && (
+              <>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "12px",
+                    margin: "18px 0",
+                  }}
+                >
+                  <div
+                    style={{
+                      flex: 1,
+                      height: "1px",
+                      background: "#D8E2DC",
+                    }}
+                  />
+
+                  <span
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 900,
+                      letterSpacing: "0.12em",
+                      color: "#667674",
+                    }}
+                  >
+                    OR
+                  </span>
+
+                  <div
+                    style={{
+                      flex: 1,
+                      height: "1px",
+                      background: "#D8E2DC",
+                    }}
+                  />
+                </div>
+
+                {/* Manual Location */}
+                <div
+                  style={{
+                    marginBottom: "14px",
+                  }}
+                >
+                  <label
+                    htmlFor="location-address"
+                    style={{
+                      display: "block",
+                      fontSize: "13px",
+                      fontWeight: 700,
+                      marginBottom: "8px",
+                    }}
+                  >
+                    Location / Address
+                    <span
+                      style={{
+                        color: "#087F7B",
+                      }}
+                    >
+                      {" "}
+                      *
+                    </span>
+                  </label>
+
+                  <textarea
+                    id="location-address"
+                    value={locationAddress}
+                    onChange={(event) =>
+                      setLocationAddress(
+                        event.target.value
+                      )
+                    }
+                    placeholder="e.g. 123 Diamond Harbour Road"
+                    maxLength={500}
+                    rows={3}
+                    disabled={
+                      state === "submitting"
+                    }
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      border:
+                        "1px solid #D8E2DC",
+                      borderRadius: "12px",
+                      padding: "13px 14px",
+                      background: "#FFFFFF",
+                      color: "#173B3A",
+                      fontSize: "14px",
+                      lineHeight: 1.5,
+                      resize: "vertical",
+                      outline: "none",
+                    }}
+                  />
+                </div>
+
+                {/* Area Dropdown */}
+                <div
+                  style={{
+                    marginBottom: "14px",
+                  }}
+                >
+                  <label
+                    htmlFor="area"
+                    style={{
+                      display: "block",
+                      fontSize: "13px",
+                      fontWeight: 700,
+                      marginBottom: "8px",
+                    }}
+                  >
+                    Area
+                    <span
+                      style={{
+                        color: "#087F7B",
+                      }}
+                    >
+                      {" "}
+                      *
+                    </span>
+                  </label>
+
+                  <select
+                    id="area"
+                    value={area}
+                    onChange={(event) =>
+                      setArea(
+                        event.target.value
+                      )
+                    }
+                    disabled={
+                      state === "submitting"
+                    }
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      border:
+                        "1px solid #D8E2DC",
+                      borderRadius: "12px",
+                      padding: "13px 14px",
+                      background: "#FFFFFF",
+                      color: area
+                        ? "#173B3A"
+                        : "#667674",
+                      fontSize: "14px",
+                      outline: "none",
+                      cursor:
+                        state === "submitting"
+                          ? "not-allowed"
+                          : "pointer",
+                    }}
+                  >
+                    <option value="">
+                      Select an area
+                    </option>
+
+                    {AREA_OPTIONS.map(
+                      (option) => (
+                        <option
+                          key={option}
+                          value={option}
+                        >
+                          {option}
+                        </option>
+                      )
+                    )}
+                  </select>
+                </div>
+              </>
+            )}
+
+            {/* Live Location Status */}
+            {locationMode === "live" &&
+              state === "locating" && (
+                <div
+                  style={{
+                    padding: "13px 14px",
+                    borderRadius: "12px",
+                    background: "#F8F3E7",
+                    color: "#667674",
+                    fontSize: "13px",
+                    marginTop: "14px",
+                  }}
+                >
+                  Getting your location...
+                </div>
+              )}
+
+            {locationMode === "live" &&
+              location &&
+              state !== "locating" && (
+                <div
+                  style={{
+                    padding: "13px 14px",
+                    borderRadius: "12px",
+                    background: "#F0F8F6",
+                    border:
+                      "1px solid #CDE5E1",
+                    color: "#075E5B",
+                    fontSize: "13px",
+                    marginTop: "14px",
+                  }}
+                >
+                  Live location added
+                  successfully.
+                </div>
+              )}
+
+            {/* Nearest Landmark */}
+            <div
+              style={{
+                marginTop: "14px",
+              }}
+            >
               <label
-                htmlFor="puja-name"
+                htmlFor="nearest-landmark"
                 style={{
                   display: "block",
                   fontSize: "13px",
-                  fontWeight: 800,
+                  fontWeight: 700,
                   marginBottom: "8px",
                 }}
               >
-                Pandal Name
-                <span style={{ color: "#087F7B" }}> *</span>
+                Nearest Landmark
+                <span
+                  style={{
+                    fontWeight: 500,
+                    color: "#667674",
+                  }}
+                >
+                  {" "}
+                  (optional)
+                </span>
               </label>
 
               <input
-                id="puja-name"
+                id="nearest-landmark"
                 type="text"
-                value={pujaName}
+                value={nearestLandmark}
                 onChange={(event) =>
-                  setPujaName(event.target.value)
+                  setNearestLandmark(
+                    event.target.value
+                  )
                 }
-                placeholder="e.g. Barisha Club"
+                placeholder="e.g. Near Barisha High School"
                 maxLength={200}
                 disabled={
-                  state === "locating" ||
                   state === "submitting"
                 }
                 style={{
                   width: "100%",
                   boxSizing: "border-box",
-                  border: "1px solid #D8E2DC",
+                  border:
+                    "1px solid #D8E2DC",
                   borderRadius: "12px",
                   padding: "13px 14px",
                   background: "#FFFFFF",
@@ -476,290 +822,51 @@ export default function Home() {
                 }}
               />
             </div>
+          </div>
 
-            {/* Location */}
-            <div style={{ marginBottom: "22px" }}>
-              <div
-                style={{
-                  fontSize: "13px",
-                  fontWeight: 800,
-                  marginBottom: "10px",
-                }}
-              >
-                Location
-                <span style={{ color: "#087F7B" }}> *</span>
-              </div>
-
-              {/* Live Location Toggle */}
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "11px",
-                  padding: "13px 14px",
-                  borderRadius: "12px",
-                  background: "#D9EFEC",
-                  border: "1px solid #C4E3DF",
-                  cursor:
-                    state === "submitting"
-                      ? "not-allowed"
-                      : "pointer",
-                  marginBottom: "14px",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={locationMode === "live"}
-                  onChange={(event) =>
-                    handleLocationModeChange(
-                      event.target.checked
-                    )
-                  }
-                  disabled={state === "submitting"}
-                  style={{
-                    width: "17px",
-                    height: "17px",
-                    accentColor: "#087F7B",
-                    cursor: "pointer",
-                  }}
-                />
-
-                <div>
-                  <div
-                    style={{
-                      fontSize: "14px",
-                      fontWeight: 800,
-                    }}
-                  >
-                    Add live location
-                  </div>
-
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      color: "#667674",
-                      marginTop: "2px",
-                    }}
-                  >
-                    Use your current GPS location
-                  </div>
-                </div>
-              </label>
-
-              {/* Live Location Status */}
-              {locationMode === "live" &&
-                state === "locating" && (
-                  <div
-                    style={{
-                      padding: "13px 14px",
-                      borderRadius: "12px",
-                      background: "#F8F3E7",
-                      color: "#667674",
-                      fontSize: "13px",
-                      marginBottom: "14px",
-                    }}
-                  >
-                    Getting your location...
-                  </div>
-                )}
-
-              {locationMode === "live" &&
-                location &&
-                state !== "locating" && (
-                  <div
-                    style={{
-                      padding: "13px 14px",
-                      borderRadius: "12px",
-                      background: "#F0F8F6",
-                      border: "1px solid #CDE5E1",
-                      color: "#075E5B",
-                      fontSize: "13px",
-                      marginBottom: "14px",
-                    }}
-                  >
-                    Live location added successfully.
-                  </div>
-                )}
-
-              {/* Manual Location Fields */}
-              {locationMode === "manual" && (
-                <>
-                  <div style={{ marginBottom: "14px" }}>
-                    <label
-                      htmlFor="location-address"
-                      style={{
-                        display: "block",
-                        fontSize: "13px",
-                        fontWeight: 700,
-                        marginBottom: "8px",
-                      }}
-                    >
-                      Location / Address
-                      <span style={{ color: "#087F7B" }}>
-                        {" "}
-                        *
-                      </span>
-                    </label>
-
-                    <textarea
-                      id="location-address"
-                      value={locationAddress}
-                      onChange={(event) =>
-                        setLocationAddress(
-                          event.target.value
-                        )
-                      }
-                      placeholder="e.g. 123 Diamond Harbour Road"
-                      maxLength={500}
-                      rows={3}
-                      disabled={state === "submitting"}
-                      style={{
-                        width: "100%",
-                        boxSizing: "border-box",
-                        border: "1px solid #D8E2DC",
-                        borderRadius: "12px",
-                        padding: "13px 14px",
-                        background: "#FFFFFF",
-                        color: "#173B3A",
-                        fontSize: "14px",
-                        lineHeight: 1.5,
-                        resize: "vertical",
-                        outline: "none",
-                      }}
-                    />
-                  </div>
-
-                  <div style={{ marginBottom: "14px" }}>
-                    <label
-                      htmlFor="area"
-                      style={{
-                        display: "block",
-                        fontSize: "13px",
-                        fontWeight: 700,
-                        marginBottom: "8px",
-                      }}
-                    >
-                      Area
-                      <span style={{ color: "#087F7B" }}>
-                        {" "}
-                        *
-                      </span>
-                    </label>
-
-                    <input
-                      id="area"
-                      type="text"
-                      value={area}
-                      onChange={(event) =>
-                        setArea(event.target.value)
-                      }
-                      placeholder="e.g. Barisha"
-                      maxLength={100}
-                      disabled={state === "submitting"}
-                      style={{
-                        width: "100%",
-                        boxSizing: "border-box",
-                        border: "1px solid #D8E2DC",
-                        borderRadius: "12px",
-                        padding: "13px 14px",
-                        background: "#FFFFFF",
-                        color: "#173B3A",
-                        fontSize: "14px",
-                        outline: "none",
-                      }}
-                    />
-                  </div>
-                </>
-              )}
-
-              {/* Nearest Landmark */}
-              <div>
-                <label
-                  htmlFor="nearest-landmark"
-                  style={{
-                    display: "block",
-                    fontSize: "13px",
-                    fontWeight: 700,
-                    marginBottom: "8px",
-                  }}
-                >
-                  Nearest Landmark
-                  <span
-                    style={{
-                      fontWeight: 500,
-                      color: "#667674",
-                    }}
-                  >
-                    {" "}
-                    (optional)
-                  </span>
-                </label>
-
-                <input
-                  id="nearest-landmark"
-                  type="text"
-                  value={nearestLandmark}
-                  onChange={(event) =>
-                    setNearestLandmark(event.target.value)
-                  }
-                  placeholder="e.g. Near Barisha High School"
-                  maxLength={200}
-                  disabled={state === "submitting"}
-                  style={{
-                    width: "100%",
-                    boxSizing: "border-box",
-                    border: "1px solid #D8E2DC",
-                    borderRadius: "12px",
-                    padding: "13px 14px",
-                    background: "#FFFFFF",
-                    color: "#173B3A",
-                    fontSize: "14px",
-                    outline: "none",
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Privacy Note */}
-            <div
+          {/* Privacy Note */}
+          <div
+            style={{
+              display: "flex",
+              gap: "9px",
+              alignItems: "flex-start",
+              padding: "12px 13px",
+              borderRadius: "12px",
+              background: "#F8F3E7",
+              color: "#667674",
+              fontSize: "12px",
+              lineHeight: 1.5,
+              marginBottom: "20px",
+            }}
+          >
+            <span
               style={{
-                display: "flex",
-                gap: "9px",
-                alignItems: "flex-start",
-                padding: "12px 13px",
-                borderRadius: "12px",
-                background: "#F8F3E7",
-                color: "#667674",
-                fontSize: "12px",
-                lineHeight: 1.5,
-                marginBottom: "20px",
+                color: "#087F7B",
+                fontWeight: 800,
+                flexShrink: 0,
               }}
             >
-              <span
-                style={{
-                  color: "#087F7B",
-                  fontWeight: 800,
-                  flexShrink: 0,
-                }}
-              >
-                ●
-              </span>
+              ●
+            </span>
 
-              <span>
-                Live location is optional. You can enter the
-                location manually instead.
-              </span>
-            </div>
+            <span>
+              Live location is optional. You
+              can enter the location manually
+              instead.
+            </span>
+          </div>
 
-            {/* Error */}
-            {state === "error" && errorMessage && (
+          {/* Error */}
+          {state === "error" &&
+            errorMessage && (
               <div
                 role="alert"
                 style={{
                   padding: "13px 14px",
                   borderRadius: "12px",
                   background: "#FFF1EF",
-                  border: "1px solid #F0D0CA",
+                  border:
+                    "1px solid #F0D0CA",
                   color: "#9A3E31",
                   fontSize: "13px",
                   lineHeight: 1.5,
@@ -770,15 +877,17 @@ export default function Home() {
               </div>
             )}
 
-            {/* Success */}
-            {state === "success" && message && (
+          {/* Success */}
+          {state === "success" &&
+            message && (
               <div
                 role="status"
                 style={{
                   padding: "14px",
                   borderRadius: "12px",
                   background: "#EAF7F3",
-                  border: "1px solid #C5E5DD",
+                  border:
+                    "1px solid #C5E5DD",
                   color: "#075E5B",
                   fontSize: "13px",
                   lineHeight: 1.5,
@@ -789,85 +898,85 @@ export default function Home() {
               </div>
             )}
 
-            {/* General Message */}
-            {state !== "success" &&
-              state !== "error" &&
-              message && (
-                <div
-                  style={{
-                    padding: "13px 14px",
-                    borderRadius: "12px",
-                    background: "#F0F8F6",
-                    color: "#075E5B",
-                    fontSize: "13px",
-                    marginBottom: "16px",
-                  }}
-                >
-                  {message}
-                </div>
-              )}
-
-            {/* Submit */}
-            {state === "success" ? (
-              <button
-                type="button"
-                onClick={reset}
+          {/* General Message */}
+          {state !== "success" &&
+            state !== "error" &&
+            message && (
+              <div
                 style={{
-                  width: "100%",
-                  border: "none",
-                  borderRadius: "13px",
-                  padding: "14px 18px",
-                  background: "#087F7B",
-                  color: "#FFFFFF",
-                  fontSize: "14px",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                  boxShadow:
-                    "0 8px 20px rgba(8, 127, 123, 0.18)",
+                  padding: "13px 14px",
+                  borderRadius: "12px",
+                  background: "#F0F8F6",
+                  color: "#075E5B",
+                  fontSize: "13px",
+                  marginBottom: "16px",
                 }}
               >
-                Add Another Pandal
-              </button>
-            ) : (
-              <button
-                type="submit"
-                disabled={
+                {message}
+              </div>
+            )}
+
+          {/* Submit */}
+          {state === "success" ? (
+            <button
+              type="button"
+              onClick={reset}
+              style={{
+                width: "100%",
+                border: "none",
+                borderRadius: "13px",
+                padding: "14px 18px",
+                background: "#087F7B",
+                color: "#FFFFFF",
+                fontSize: "14px",
+                fontWeight: 800,
+                cursor: "pointer",
+                boxShadow:
+                  "0 8px 20px rgba(8, 127, 123, 0.18)",
+              }}
+            >
+              Add Another Pandal
+            </button>
+          ) : (
+            <button
+              type="submit"
+              onClick={() => undefined}
+              disabled={
+                state === "locating" ||
+                state === "submitting"
+              }
+              style={{
+                width: "100%",
+                border: "none",
+                borderRadius: "13px",
+                padding: "14px 18px",
+                background:
                   state === "locating" ||
                   state === "submitting"
-                }
-                style={{
-                  width: "100%",
-                  border: "none",
-                  borderRadius: "13px",
-                  padding: "14px 18px",
-                  background:
-                    state === "locating" ||
-                    state === "submitting"
-                      ? "#A8C8C5"
-                      : "#087F7B",
-                  color: "#FFFFFF",
-                  fontSize: "14px",
-                  fontWeight: 800,
-                  cursor:
-                    state === "locating" ||
-                    state === "submitting"
-                      ? "not-allowed"
-                      : "pointer",
-                  boxShadow:
-                    state === "locating" ||
-                    state === "submitting"
-                      ? "none"
-                      : "0 8px 20px rgba(8, 127, 123, 0.18)",
-                }}
-              >
-                {state === "locating"
-                  ? "Getting Location..."
-                  : state === "submitting"
-                    ? "Adding Pandal..."
-                    : "Add Pandal"}
-              </button>
-            )}
-          </form>
+                    ? "#A8C8C5"
+                    : "#087F7B",
+                color: "#FFFFFF",
+                fontSize: "14px",
+                fontWeight: 800,
+                cursor:
+                  state === "locating" ||
+                  state === "submitting"
+                    ? "not-allowed"
+                    : "pointer",
+                boxShadow:
+                  state === "locating" ||
+                  state === "submitting"
+                    ? "none"
+                    : "0 8px 20px rgba(8, 127, 123, 0.18)",
+              }}
+            >
+              {state === "locating"
+                ? "Getting Location..."
+                : state === "submitting"
+                  ? "Adding Pandal..."
+                  : "Add Pandal"}
+            </button>
+          )}
         </section>
 
         {/* Footer */}
