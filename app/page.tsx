@@ -557,6 +557,41 @@ export default function Home() {
                 </span>
               </div>
 
+              {/* ========================================
+                PRIVACY NOTE
+            ======================================== */}
+
+            <div
+              style={{
+                display: "flex",
+                gap: "9px",
+                alignItems: "flex-start",
+                padding: "12px 13px",
+                borderRadius: "12px",
+                background: "#F8F3E7",
+                color: "#667674",
+                fontSize: "12px",
+                lineHeight: 1.5,
+                marginBottom: "20px",
+              }}
+            >
+              <span
+                style={{
+                  color: "#087F7B",
+                  fontWeight: 800,
+                  flexShrink: 0,
+                }}
+              >
+                ●
+              </span>
+
+              <span>
+                Live location is optional.
+                You can enter the
+                location manually instead.
+              </span>
+            </div>
+
               {/* ======================================
                   LIVE LOCATION
               ====================================== */}
@@ -911,41 +946,6 @@ export default function Home() {
                   }}
                 />
               </div>
-            </div>
-
-            {/* ========================================
-                PRIVACY NOTE
-            ======================================== */}
-
-            <div
-              style={{
-                display: "flex",
-                gap: "9px",
-                alignItems: "flex-start",
-                padding: "12px 13px",
-                borderRadius: "12px",
-                background: "#F8F3E7",
-                color: "#667674",
-                fontSize: "12px",
-                lineHeight: 1.5,
-                marginBottom: "20px",
-              }}
-            >
-              <span
-                style={{
-                  color: "#087F7B",
-                  fontWeight: 800,
-                  flexShrink: 0,
-                }}
-              >
-                ●
-              </span>
-
-              <span>
-                Live location is optional.
-                You can enter the
-                location manually instead.
-              </span>
             </div>
 
             {/* ========================================
