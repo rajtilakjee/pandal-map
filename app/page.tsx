@@ -355,7 +355,7 @@ export default function Home() {
 
             <h1>
               Pandal
-              <span>GO</span>
+              <span>MAP</span>
             </h1>
           </div>
         </header>
