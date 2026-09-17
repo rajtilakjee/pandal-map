@@ -212,7 +212,7 @@ export default function Home() {
       nearestLandmark.trim();
 
     /*
-     * Validate Pandal Name
+     * Pandal name validation
      */
     if (!trimmedName) {
       setState("error");
@@ -231,7 +231,7 @@ export default function Home() {
     }
 
     /*
-     * Validate Live Location
+     * Live location validation
      */
     if (
       locationMode === "live" &&
@@ -245,7 +245,7 @@ export default function Home() {
     }
 
     /*
-     * Validate Manual Location
+     * Manual location validation
      */
     if (locationMode === "manual") {
       if (!trimmedAddress) {
@@ -282,7 +282,7 @@ export default function Home() {
     }
 
     /*
-     * Validate Landmark
+     * Landmark validation
      */
     if (trimmedLandmark.length > 200) {
       setState("error");
@@ -294,9 +294,6 @@ export default function Home() {
 
     setState("submitting");
 
-    /*
-     * Prepare Supabase submission
-     */
     const submission = {
       puja_name: trimmedName,
 
@@ -331,9 +328,6 @@ export default function Home() {
       year: new Date().getFullYear(),
     };
 
-    /*
-     * Insert into Supabase
-     */
     const { error } = await supabase
       .from("pandal_submissions")
       .insert(submission);
@@ -367,142 +361,86 @@ export default function Home() {
   };
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#F8F3E7",
-        color: "#173B3A",
-        fontFamily:
-          "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: "760px",
-          margin: "0 auto",
-          padding: "24px 18px 0",
-          boxSizing: "border-box",
-        }}
-      >
+    <main className="min-h-screen bg-white text-zinc-950 font-sans antialiased flex flex-col">
+      <div className="w-full max-w-lg mx-auto px-4 py-10 sm:px-6 sm:py-12 flex-1">
+
         {/* ============================================
             HEADER
         ============================================ */}
 
-        <header
-          style={{
-            textAlign: "center",
-            marginBottom: "28px",
-          }}
-        >
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "52px",
-              height: "52px",
-              borderRadius: "50%",
-              background: "#087F7B",
-              color: "#FFFDF7",
-              fontSize: "27px",
-              marginBottom: "12px",
-              boxShadow:
-                "0 8px 24px rgba(8, 127, 123, 0.18)",
-            }}
-          >
-            ॐ
+        <header className="text-center space-y-3 mb-8">
+
+          {/* Location Badge */}
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-zinc-200 bg-zinc-50 text-zinc-800 text-xs font-mono font-medium tracking-tight">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-zinc-900"
+            >
+              <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 1 1 16 0Z" />
+              <circle cx="12" cy="10" r="3" />
+            </svg>
+
+            <span>Kolkata Puja Directory</span>
           </div>
 
-          <div
-            style={{
-              fontSize: "11px",
-              fontWeight: 800,
-              letterSpacing: "0.16em",
-              color: "#087F7B",
-              marginBottom: "5px",
-            }}
-          >
-            DURGA PUJA • KOLKATA
-          </div>
-
-          <h1
-            style={{
-              margin: 0,
-              fontSize:
-                "clamp(34px, 8vw, 52px)",
-              lineHeight: 1,
-              letterSpacing: "-0.045em",
-              fontWeight: 900,
-              color: "#075E5B",
-            }}
-          >
-            PandalMAP
+          {/* Logo */}
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-zinc-950 font-mono">
+            Pandal
+            <span className="underline decoration-1 underline-offset-4">
+              MAP
+            </span>
           </h1>
 
-          <p
-            style={{
-              maxWidth: "520px",
-              margin: "12px auto 0",
-              fontSize: "15px",
-              lineHeight: 1.6,
-              color: "#667674",
-            }}
-          >
-            Help build a living map of
-            Kolkata&apos;s Durga Puja
-            pandals.
+          <p className="text-xs font-mono text-zinc-500 max-w-sm mx-auto">
+            Help build a living map of Kolkata&apos;s
+            Durga Puja pandals.
           </p>
         </header>
 
         {/* ============================================
-            MAIN CARD
+            FORM CARD
         ============================================ */}
 
-        <section
-          style={{
-            background: "#FFFDF7",
-            border: "1px solid #D8E2DC",
-            borderRadius: "24px",
-            padding:
-              "clamp(20px, 5vw, 34px)",
-            boxShadow:
-              "0 16px 50px rgba(23, 59, 58, 0.07)",
-          }}
-        >
-          <form onSubmit={submitPandal}>
+        <div className="bg-white rounded-xl border border-zinc-200 shadow-sm p-6 sm:p-8">
+
+          <form
+            onSubmit={submitPandal}
+            className="space-y-6"
+          >
+
+            {/* ========================================
+                SEPARATOR
+            ======================================== */}
+
+            <div className="border-t border-zinc-200" />
+
             {/* ========================================
                 PANDAL NAME
             ======================================== */}
 
-            <div
-              style={{
-                marginBottom: "24px",
-              }}
-            >
+            <div className="space-y-2">
               <label
-                htmlFor="puja-name"
-                style={{
-                  display: "block",
-                  fontSize: "13px",
-                  fontWeight: 800,
-                  marginBottom: "8px",
-                }}
+                htmlFor="pandal-name"
+                className="text-sm font-medium leading-none text-zinc-950 flex justify-between"
               >
-                Pandal Name
-                <span
-                  style={{
-                    color: "#087F7B",
-                  }}
-                >
-                  {" "}
-                  *
+                <span>Pandal Name</span>
+
+                <span className="font-mono text-xs text-zinc-400">
+                  Required
                 </span>
               </label>
 
               <input
-                id="puja-name"
                 type="text"
+                id="pandal-name"
                 value={pujaName}
                 onChange={(event) =>
                   setPujaName(
@@ -515,18 +453,8 @@ export default function Home() {
                   state === "locating" ||
                   state === "submitting"
                 }
-                style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  border:
-                    "1px solid #D8E2DC",
-                  borderRadius: "12px",
-                  padding: "13px 14px",
-                  background: "#FFFFFF",
-                  color: "#173B3A",
-                  fontSize: "14px",
-                  outline: "none",
-                }}
+                required
+                className="flex h-9 w-full rounded-md border border-zinc-200 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-zinc-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
 
@@ -534,61 +462,43 @@ export default function Home() {
                 LOCATION
             ======================================== */}
 
-            <div
-              style={{
-                marginBottom: "22px",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "13px",
-                  fontWeight: 800,
-                  marginBottom: "10px",
-                }}
-              >
+            <div className="space-y-3">
+
+              <label className="text-sm font-medium leading-none text-zinc-950">
                 Location
-                <span
-                  style={{
-                    color: "#087F7B",
-                  }}
-                >
-                  {" "}
-                  *
-                </span>
-              </div>
+              </label>
 
               {/* ========================================
-                PRIVACY NOTE
+                INFO BOX
             ======================================== */}
 
-            <div
-              style={{
-                display: "flex",
-                gap: "9px",
-                alignItems: "flex-start",
-                padding: "12px 13px",
-                borderRadius: "12px",
-                background: "#F8F3E7",
-                color: "#667674",
-                fontSize: "12px",
-                lineHeight: 1.5,
-                marginBottom: "20px",
-              }}
-            >
-              <span
-                style={{
-                  color: "#087F7B",
-                  fontWeight: 800,
-                  flexShrink: 0,
-                }}
+            <div className="flex items-start gap-2.5 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-600 font-mono">
+
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-zinc-950 flex-shrink-0 mt-0.5"
               >
-                ●
-              </span>
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="10"
+                />
+                <path d="M12 16v-4" />
+                <path d="M12 8h.01" />
+              </svg>
 
               <span>
                 Live location is optional.
-                You can enter the
-                location manually instead.
+                Manual entries work fine if
+                GPS permission is denied.
               </span>
             </div>
 
@@ -596,86 +506,91 @@ export default function Home() {
                   LIVE LOCATION
               ====================================== */}
 
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "11px",
-                  padding: "13px 14px",
-                  borderRadius: "12px",
-                  background: "#D9EFEC",
-                  border:
-                    "1px solid #C4E3DF",
-                  cursor:
-                    state === "submitting"
-                      ? "not-allowed"
-                      : "pointer",
-                }}
+              <button
+                type="button"
+                onClick={() =>
+                  handleLocationModeChange(
+                    locationMode !== "live"
+                  )
+                }
+                disabled={
+                  state === "submitting" ||
+                  state === "locating"
+                }
+                className={`w-full flex items-center justify-between p-3.5 rounded-lg border transition-all text-left group disabled:cursor-not-allowed disabled:opacity-60 ${
+                  locationMode === "live"
+                    ? "border-zinc-950 bg-zinc-50"
+                    : "border-zinc-200 bg-zinc-50 hover:bg-zinc-100"
+                }`}
               >
-                <input
-                  type="checkbox"
-                  checked={
-                    locationMode === "live"
-                  }
-                  onChange={(event) =>
-                    handleLocationModeChange(
-                      event.target.checked
-                    )
-                  }
-                  disabled={
-                    state === "submitting"
-                  }
-                  style={{
-                    width: "17px",
-                    height: "17px",
-                    accentColor: "#087F7B",
-                    cursor: "pointer",
-                    flexShrink: 0,
-                  }}
-                />
+                <div className="flex items-center gap-3">
 
-                <div>
-                  <div
-                    style={{
-                      fontSize: "14px",
-                      fontWeight: 800,
-                    }}
-                  >
-                    Add live location
+                  <div className="p-2 rounded-md bg-zinc-950 text-white shadow-sm">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="10"
+                      />
+                      <line
+                        x1="22"
+                        x2="18"
+                        y1="12"
+                        y2="12"
+                      />
+                      <line
+                        x1="6"
+                        x2="2"
+                        y1="12"
+                        y2="12"
+                      />
+                      <line
+                        x1="12"
+                        x2="12"
+                        y1="6"
+                        y2="2"
+                      />
+                      <line
+                        x1="12"
+                        x2="12"
+                        y1="22"
+                        y2="18"
+                      />
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="3"
+                      />
+                    </svg>
                   </div>
 
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      color: "#667674",
-                      marginTop: "2px",
-                    }}
-                  >
-                    Use your current GPS
-                    location
+                  <div>
+                    <p className="text-sm font-semibold text-zinc-950">
+                      Add Live Location (GPS)
+                    </p>
+
+                    <p className="text-xs font-mono text-zinc-500">
+                      Click/Tap here to auto-detect GPS coordinates
+                    </p>
                   </div>
                 </div>
-              </label>
 
-              {/* ======================================
-                  LIVE LOCATION LOADING
-              ====================================== */}
-
-              {locationMode === "live" &&
-                state === "locating" && (
-                  <div
-                    style={{
-                      padding: "13px 14px",
-                      borderRadius: "12px",
-                      background: "#F8F3E7",
-                      color: "#667674",
-                      fontSize: "13px",
-                      marginTop: "14px",
-                    }}
-                  >
-                    Getting your location...
-                  </div>
-                )}
+                <span className="text-[10px] font-mono font-medium uppercase tracking-wider text-zinc-950 bg-zinc-200 border border-zinc-300 px-2 py-0.5 rounded">
+                  {state === "locating"
+                    ? "..."
+                    : "GPS"}
+                </span>
+              </button>
 
               {/* ======================================
                   LIVE LOCATION SUCCESS
@@ -684,268 +599,200 @@ export default function Home() {
               {locationMode === "live" &&
                 location &&
                 state !== "locating" && (
-                  <div
-                    style={{
-                      padding: "13px 14px",
-                      borderRadius: "12px",
-                      background: "#F0F8F6",
-                      border:
-                        "1px solid #CDE5E1",
-                      color: "#075E5B",
-                      fontSize: "13px",
-                      marginTop: "14px",
-                    }}
-                  >
-                    Live location added
-                    successfully.
+                  <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs font-mono text-zinc-600">
+                    <div className="flex items-center gap-2">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M20 6 9 17l-5-5" />
+                      </svg>
+
+                      <span>
+                        Live location added
+                        successfully.
+                      </span>
+                    </div>
                   </div>
                 )}
 
               {/* ======================================
-                  OR SEPARATOR + MANUAL LOCATION
+                  OR DIVIDER
               ====================================== */}
 
               {locationMode === "manual" && (
                 <>
-                  {/* OR */}
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "12px",
-                      margin: "18px 0",
-                    }}
-                  >
-                    <div
-                      style={{
-                        flex: 1,
-                        height: "1px",
-                        background:
-                          "#D8E2DC",
-                      }}
-                    />
+                  <div className="relative flex py-2 items-center">
+                    <div className="flex-grow border-t border-zinc-200" />
 
-                    <span
-                      style={{
-                        fontSize: "11px",
-                        fontWeight: 900,
-                        letterSpacing:
-                          "0.12em",
-                        color: "#667674",
-                      }}
-                    >
-                      OR
+                    <span className="flex-shrink mx-4 text-[10px] font-mono font-semibold text-zinc-400 tracking-wider uppercase">
+                      Or Enter Address
                     </span>
 
-                    <div
-                      style={{
-                        flex: 1,
-                        height: "1px",
-                        background:
-                          "#D8E2DC",
-                      }}
-                    />
+                    <div className="flex-grow border-t border-zinc-200" />
                   </div>
 
-                  {/* Location / Address */}
-                  <div
-                    style={{
-                      marginBottom: "14px",
-                    }}
-                  >
-                    <label
-                      htmlFor="location-address"
-                      style={{
-                        display: "block",
-                        fontSize: "13px",
-                        fontWeight: 700,
-                        marginBottom: "8px",
-                      }}
-                    >
-                      Location / Address
-                      <span
-                        style={{
-                          color: "#087F7B",
-                        }}
+                  {/* ==================================
+                      MANUAL ADDRESS
+                  ================================== */}
+
+                  <div className="space-y-4">
+
+                    <div className="space-y-1.5">
+                      <label
+                        htmlFor="address"
+                        className="text-xs font-mono text-zinc-600"
                       >
-                        {" "}
-                        *
-                      </span>
-                    </label>
+                        Street Address
+                        <span className="text-zinc-400">
+                          {" "}
+                          *
+                        </span>
+                      </label>
 
-                    <textarea
-                      id="location-address"
-                      value={locationAddress}
-                      onChange={(event) =>
-                        setLocationAddress(
-                          event.target.value
-                        )
-                      }
-                      placeholder="e.g. 123 Diamond Harbour Road"
-                      maxLength={500}
-                      rows={3}
-                      disabled={
-                        state ===
-                        "submitting"
-                      }
-                      style={{
-                        width: "100%",
-                        boxSizing:
-                          "border-box",
-                        border:
-                          "1px solid #D8E2DC",
-                        borderRadius: "12px",
-                        padding:
-                          "13px 14px",
-                        background:
-                          "#FFFFFF",
-                        color: "#173B3A",
-                        fontSize: "14px",
-                        lineHeight: 1.5,
-                        resize: "vertical",
-                        outline: "none",
-                      }}
-                    />
-                  </div>
+                      <textarea
+                        id="address"
+                        value={locationAddress}
+                        onChange={(event) =>
+                          setLocationAddress(
+                            event.target.value
+                          )
+                        }
+                        rows={2}
+                        maxLength={500}
+                        placeholder="e.g. 123 Diamond Harbour Road"
+                        disabled={
+                          state === "submitting"
+                        }
+                        className="flex w-full rounded-md border border-zinc-200 bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-zinc-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950 resize-none disabled:cursor-not-allowed disabled:opacity-50"
+                      />
+                    </div>
 
-                  {/* Area Dropdown */}
-                  <div
-                    style={{
-                      marginBottom: "14px",
-                    }}
-                  >
-                    <label
-                      htmlFor="area"
-                      style={{
-                        display: "block",
-                        fontSize: "13px",
-                        fontWeight: 700,
-                        marginBottom: "8px",
-                      }}
-                    >
-                      Area
-                      <span
-                        style={{
-                          color: "#087F7B",
-                        }}
+                    {/* ==================================
+                        AREA
+                    ================================== */}
+
+                    <div className="space-y-1.5">
+                      <label
+                        htmlFor="area"
+                        className="text-xs font-mono text-zinc-600"
                       >
-                        {" "}
-                        *
-                      </span>
-                    </label>
+                        Area / Zone
+                        <span className="text-zinc-400">
+                          {" "}
+                          *
+                        </span>
+                      </label>
 
-                    <select
-                      id="area"
-                      value={area}
-                      onChange={(event) =>
-                        setArea(
-                          event.target.value
-                        )
-                      }
-                      disabled={
-                        state ===
-                        "submitting"
-                      }
-                      style={{
-                        width: "100%",
-                        boxSizing:
-                          "border-box",
-                        border:
-                          "1px solid #D8E2DC",
-                        borderRadius: "12px",
-                        padding:
-                          "13px 14px",
-                        background:
-                          "#FFFFFF",
-                        color: area
-                          ? "#173B3A"
-                          : "#667674",
-                        fontSize: "14px",
-                        outline: "none",
-                        cursor:
-                          state ===
-                          "submitting"
-                            ? "not-allowed"
-                            : "pointer",
-                      }}
-                    >
-                      <option value="">
-                        Select an area
-                      </option>
+                      <div className="relative">
 
-                      {AREA_OPTIONS.map(
-                        (option) => (
-                          <option
-                            key={option}
-                            value={option}
-                          >
-                            {option}
+                        <select
+                          id="area"
+                          value={area}
+                          onChange={(event) =>
+                            setArea(
+                              event.target.value
+                            )
+                          }
+                          disabled={
+                            state === "submitting"
+                          }
+                          required
+                          className={`flex h-9 w-full appearance-none rounded-md border border-zinc-200 bg-transparent px-3 py-1 pr-8 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 ${
+                            area
+                              ? "text-zinc-900"
+                              : "text-zinc-400"
+                          }`}
+                        >
+                          <option value="">
+                            Select an area...
                           </option>
-                        )
-                      )}
-                    </select>
+
+                          {AREA_OPTIONS.map(
+                            (option) => (
+                              <option
+                                key={option}
+                                value={option}
+                              >
+                                {option}
+                              </option>
+                            )
+                          )}
+                        </select>
+
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="w-4 h-4 text-zinc-400 absolute right-3 top-2.5 pointer-events-none"
+                        >
+                          <path d="m6 9 6 6 6-6" />
+                        </svg>
+
+                      </div>
+                    </div>
+
+                    {/* ==================================
+                        LANDMARK
+                    ================================== */}
+
+                    <div className="space-y-1.5">
+                      <label
+                        htmlFor="landmark"
+                        className="text-xs font-mono text-zinc-600"
+                      >
+                        Nearest Landmark{" "}
+                        <span className="text-zinc-400">
+                          (optional)
+                        </span>
+                      </label>
+
+                      <input
+                        type="text"
+                        id="landmark"
+                        value={nearestLandmark}
+                        onChange={(event) =>
+                          setNearestLandmark(
+                            event.target.value
+                          )
+                        }
+                        maxLength={200}
+                        placeholder="e.g. Near Barisha High School"
+                        disabled={
+                          state === "submitting"
+                        }
+                        className="flex h-9 w-full rounded-md border border-zinc-200 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-zinc-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                      />
+                    </div>
+
                   </div>
                 </>
               )}
 
               {/* ======================================
-                  NEAREST LANDMARK
+                  LOCATING MESSAGE
               ====================================== */}
 
-              <div
-                style={{
-                  marginTop: "14px",
-                }}
-              >
-                <label
-                  htmlFor="nearest-landmark"
-                  style={{
-                    display: "block",
-                    fontSize: "13px",
-                    fontWeight: 700,
-                    marginBottom: "8px",
-                  }}
-                >
-                  Nearest Landmark
-                  <span
-                    style={{
-                      fontWeight: 500,
-                      color: "#667674",
-                    }}
-                  >
-                    {" "}
-                    (optional)
-                  </span>
-                </label>
+              {locationMode === "live" &&
+                state === "locating" && (
+                  <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs font-mono text-zinc-500">
+                    Detecting your GPS location...
+                  </div>
+                )}
 
-                <input
-                  id="nearest-landmark"
-                  type="text"
-                  value={nearestLandmark}
-                  onChange={(event) =>
-                    setNearestLandmark(
-                      event.target.value
-                    )
-                  }
-                  placeholder="e.g. Near Barisha High School"
-                  maxLength={200}
-                  disabled={
-                    state === "submitting"
-                  }
-                  style={{
-                    width: "100%",
-                    boxSizing: "border-box",
-                    border:
-                      "1px solid #D8E2DC",
-                    borderRadius: "12px",
-                    padding: "13px 14px",
-                    background: "#FFFFFF",
-                    color: "#173B3A",
-                    fontSize: "14px",
-                    outline: "none",
-                  }}
-                />
-              </div>
             </div>
 
             {/* ========================================
@@ -956,17 +803,7 @@ export default function Home() {
               errorMessage && (
                 <div
                   role="alert"
-                  style={{
-                    padding: "13px 14px",
-                    borderRadius: "12px",
-                    background: "#FFF1EF",
-                    border:
-                      "1px solid #F0D0CA",
-                    color: "#9A3E31",
-                    fontSize: "13px",
-                    lineHeight: 1.5,
-                    marginBottom: "16px",
-                  }}
+                  className="rounded-lg border border-zinc-300 bg-zinc-50 p-3 text-xs font-mono text-zinc-700"
                 >
                   {errorMessage}
                 </div>
@@ -980,66 +817,59 @@ export default function Home() {
               message && (
                 <div
                   role="status"
-                  style={{
-                    padding: "14px",
-                    borderRadius: "12px",
-                    background: "#EAF7F3",
-                    border:
-                      "1px solid #C5E5DD",
-                    color: "#075E5B",
-                    fontSize: "13px",
-                    lineHeight: 1.5,
-                    marginBottom: "16px",
-                  }}
+                  className="rounded-lg border border-zinc-300 bg-zinc-50 p-3 text-xs font-mono text-zinc-700"
                 >
-                  {message}
+                  <div className="flex items-start gap-2">
+
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="flex-shrink-0 mt-0.5 text-zinc-950"
+                    >
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
+
+                    <span>{message}</span>
+
+                  </div>
                 </div>
               )}
 
             {/* ========================================
-                GENERAL MESSAGE
-            ======================================== */}
-
-            {state !== "success" &&
-              state !== "error" &&
-              message && (
-                <div
-                  style={{
-                    padding: "13px 14px",
-                    borderRadius: "12px",
-                    background: "#F0F8F6",
-                    color: "#075E5B",
-                    fontSize: "13px",
-                    marginBottom: "16px",
-                  }}
-                >
-                  {message}
-                </div>
-              )}
-
-            {/* ========================================
-                SUBMIT / SUCCESS BUTTON
+                SUBMIT BUTTON
             ======================================== */}
 
             {state === "success" ? (
               <button
                 type="button"
                 onClick={reset}
-                style={{
-                  width: "100%",
-                  border: "none",
-                  borderRadius: "13px",
-                  padding: "14px 18px",
-                  background: "#087F7B",
-                  color: "#FFFFFF",
-                  fontSize: "14px",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                  boxShadow:
-                    "0 8px 20px rgba(8, 127, 123, 0.18)",
-                }}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-zinc-950 px-4 py-2.5 text-sm font-medium text-white shadow hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950 active:scale-[0.99]"
               >
-                Add Another Pandal
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M12 5v14" />
+                  <path d="M5 12h14" />
+                </svg>
+
+                <span>
+                  Add Another Pandal
+                </span>
               </button>
             ) : (
               <button
@@ -1048,70 +878,73 @@ export default function Home() {
                   state === "locating" ||
                   state === "submitting"
                 }
-                style={{
-                  width: "100%",
-                  border: "none",
-                  borderRadius: "13px",
-                  padding: "14px 18px",
-                  background:
-                    state === "locating" ||
-                    state === "submitting"
-                      ? "#A8C8C5"
-                      : "#087F7B",
-                  color: "#FFFFFF",
-                  fontSize: "14px",
-                  fontWeight: 800,
-                  cursor:
-                    state === "locating" ||
-                    state === "submitting"
-                      ? "not-allowed"
-                      : "pointer",
-                  boxShadow:
-                    state === "locating" ||
-                    state === "submitting"
-                      ? "none"
-                      : "0 8px 20px rgba(8, 127, 123, 0.18)",
-                }}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-zinc-950 px-4 py-2.5 text-sm font-medium text-white shadow hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {state === "locating"
-                  ? "Getting Location..."
-                  : state === "submitting"
-                    ? "Adding Pandal..."
-                    : "Add Pandal"}
+                {state === "submitting" ? (
+                  <>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="animate-spin"
+                    >
+                      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                    </svg>
+
+                    <span>
+                      Adding Pandal...
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M12 5v14" />
+                      <path d="M5 12h14" />
+                    </svg>
+
+                    <span>
+                      Add Pandal
+                    </span>
+                  </>
+                )}
               </button>
             )}
+
           </form>
-        </section>
-
-        {/* ============================================
-            FOOTER
-        ============================================ */}
-
-        <footer
-          style={{
-            marginTop: "30px",
-            padding: "18px 16px 28px",
-            textAlign: "center",
-            color: "#667674",
-            fontSize: "13px",
-          }}
-        >
-          <span>Built by </span>
-
-          <a
-            href="https://x.com/rajtilakjee"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              color: "#087F7B",
-              fontWeight: 800,
-              textDecoration: "none",
-            }}
-          >
-            @rajtilakjee
-          </a>
-        </footer>
+        </div>
       </div>
+
+      {/* ============================================
+          FOOTER
+      ============================================ */}
+
+      <footer className="text-center font-mono text-xs text-zinc-400 pb-8 px-4">
+        Built by{" "}
+        <a
+          href="https://x.com/rajtilakjee"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium text-zinc-950 hover:underline underline-offset-4"
+        >
+          @rajtilakjee
+        </a>
+      </footer>
     </main>
   );
 }
