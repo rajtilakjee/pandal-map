@@ -437,7 +437,7 @@ export default function Home() {
               color: "#075E5B",
             }}
           >
-            PandalGO
+            PandalMAP
           </h1>
 
           <p
