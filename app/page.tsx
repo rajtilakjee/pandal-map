@@ -1,69 +1,663 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+import { supabase } from "@/lib/supabase";
+
+type LocationData = {
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+};
+
+type NearbyPandal = {
+  id: string;
+  puja_name: string;
+  latitude: number;
+  longitude: number;
+  distance_meters: number;
+};
+
+type SubmissionState =
+  | "idle"
+  | "locating"
+  | "checking"
+  | "naming"
+  | "submitting"
+  | "success"
+  | "error";
+
+function isRateLimitError(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const err = error as {
+    code?: string;
+    message?: string;
+    details?: string;
+    hint?: string;
+  };
+
+  const combined = [
+    err.code,
+    err.message,
+    err.details,
+    err.hint,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    combined.includes("429") ||
+    combined.includes("too many requests") ||
+    combined.includes("rate limit") ||
+    combined.includes("submission limit")
+  );
+}
+
+function getErrorMessage(error: unknown): string {
+  if (!error || typeof error !== "object") {
+    return "Something went wrong. Please try again.";
+  }
+
+  const err = error as {
+    message?: string;
+    details?: string;
+    hint?: string;
+  };
+
+  return (
+    err.message ||
+    err.details ||
+    err.hint ||
+    "Something went wrong. Please try again."
+  );
+}
 
 export default function Home() {
+  const [state, setState] = useState<SubmissionState>("idle");
+
+  const [location, setLocation] = useState<LocationData | null>(null);
+
+  const [nearbyPandal, setNearbyPandal] =
+    useState<NearbyPandal | null>(null);
+
+  const [pujaName, setPujaName] = useState("");
+
+  const [message, setMessage] = useState("");
+
+  const [errorMessage, setErrorMessage] = useState("");
+
+  /**
+   * Get the user's current location.
+   */
+  const getLocation = () => {
+    setState("locating");
+    setMessage("");
+    setErrorMessage("");
+    setNearbyPandal(null);
+
+    if (!navigator.geolocation) {
+      setState("error");
+      setErrorMessage(
+        "Your browser does not support location services."
+      );
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const locationData: LocationData = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+        };
+
+        setLocation(locationData);
+
+        await checkNearbyPandals(locationData);
+      },
+      (error) => {
+        console.error("Location error:", error);
+
+        setState("error");
+
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            setErrorMessage(
+              "Location permission was denied. Please allow location access and try again."
+            );
+            break;
+
+          case error.POSITION_UNAVAILABLE:
+            setErrorMessage(
+              "Your location could not be determined. Please try again."
+            );
+            break;
+
+          case error.TIMEOUT:
+            setErrorMessage(
+              "Location lookup took too long. Please try again."
+            );
+            break;
+
+          default:
+            setErrorMessage(
+              "Unable to get your location. Please try again."
+            );
+        }
+      },
+      {
+        enableHighAccuracy: false,
+        maximumAge: 30000,
+        timeout: 5000,
+      }
+    );
+  };
+
+  /**
+   * Ask Supabase whether another Pandal exists
+   * within 50 meters of the user's location.
+   */
+  const checkNearbyPandals = async (
+    locationData: LocationData
+  ) => {
+    setState("checking");
+    setMessage("");
+    setErrorMessage("");
+
+    try {
+      const { data, error } = await supabase.rpc(
+        "find_nearby_pandals",
+        {
+          user_lat: locationData.latitude,
+          user_lng: locationData.longitude,
+          radius_meters: 50,
+        }
+      );
+
+      if (error) {
+        console.error("Nearby Pandal check failed:", {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+        });
+
+        /*
+         * A nearby check is not allowed to prevent
+         * the user from submitting a Pandal.
+         *
+         * If rate limiting fails here, we show a
+         * friendly message rather than silently
+         * pretending the check succeeded.
+         */
+        if (isRateLimitError(error)) {
+          setState("error");
+          setErrorMessage(
+            "You've checked locations too frequently. Please wait a few minutes and try again."
+          );
+          return;
+        }
+
+        /*
+         * For other RPC failures, allow the user to
+         * continue with a new Pandal submission.
+         *
+         * This preserves the behavior of the original
+         * app where duplicate detection is helpful,
+         * but not a hard requirement for submission.
+         */
+        console.warn(
+          "Duplicate detection failed. Continuing without it."
+        );
+
+        setNearbyPandal(null);
+        setState("naming");
+        return;
+      }
+
+      if (data && data.length > 0) {
+        setNearbyPandal(data[0]);
+        setState("naming");
+        return;
+      }
+
+      setNearbyPandal(null);
+      setState("naming");
+    } catch (error) {
+      console.error("Unexpected nearby check error:", error);
+
+      setNearbyPandal(null);
+      setState("naming");
+    }
+  };
+
+  /**
+   * Submit the Pandal.
+   */
+  const submitPandal = async () => {
+    if (!location) {
+      setState("error");
+      setErrorMessage(
+        "Please capture your location first."
+      );
+      return;
+    }
+
+    const trimmedName = pujaName.trim();
+
+    if (!trimmedName) {
+      setErrorMessage("Please enter the Puja name.");
+      return;
+    }
+
+    if (trimmedName.length > 200) {
+      setErrorMessage(
+        "The Puja name must be 200 characters or fewer."
+      );
+      return;
+    }
+
+    setState("submitting");
+    setMessage("");
+    setErrorMessage("");
+
+    try {
+      const { error } = await supabase
+        .from("pandal_submissions")
+        .insert({
+          puja_name: trimmedName,
+          latitude: location.latitude,
+          longitude: location.longitude,
+          accuracy: location.accuracy,
+          year: new Date().getFullYear(),
+        });
+
+      if (error) {
+        console.error("Submission failed:", {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+        });
+
+        if (isRateLimitError(error)) {
+          setState("error");
+          setErrorMessage(
+            "You've submitted several Pandals recently. Please try again later."
+          );
+          return;
+        }
+
+        setState("error");
+        setErrorMessage(getErrorMessage(error));
+        return;
+      }
+
+      setState("success");
+      setMessage(
+        "Pandal submitted successfully. Thank you for contributing!"
+      );
+
+      setPujaName("");
+    } catch (error) {
+      console.error("Unexpected submission error:", error);
+
+      if (isRateLimitError(error)) {
+        setState("error");
+        setErrorMessage(
+          "You've submitted several Pandals recently. Please try again later."
+        );
+        return;
+      }
+
+      setState("error");
+      setErrorMessage(
+        "Something went wrong while submitting. Please try again."
+      );
+    }
+  };
+
+  /**
+   * User confirms that the nearby Pandal is the one
+   * they are currently standing at.
+   *
+   * We still ask for the Puja name because we want
+   * the submission to contain the actual name.
+   */
+  const confirmNearbyPandal = () => {
+    if (!nearbyPandal) {
+      return;
+    }
+
+    setPujaName(nearbyPandal.puja_name);
+    setState("naming");
+    setErrorMessage("");
+  };
+
+  /**
+   * User says the nearby result is NOT the same Pandal.
+   */
+  const chooseNewPandal = () => {
+    setNearbyPandal(null);
+    setPujaName("");
+    setState("naming");
+    setErrorMessage("");
+  };
+
+  /**
+   * Reset the entire flow.
+   */
+  const reset = () => {
+    setState("idle");
+    setLocation(null);
+    setNearbyPandal(null);
+    setPujaName("");
+    setMessage("");
+    setErrorMessage("");
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <main
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        padding: "24px",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "520px",
+        }}
+      >
+        <h1
+          style={{
+            fontSize: "2.5rem",
+            marginBottom: "8px",
+          }}
+        >
+          Find Durga Puja Pandals
+        </h1>
+
+        <p
+          style={{
+            color: "#666",
+            marginBottom: "32px",
+            lineHeight: 1.6,
+          }}
+        >
+          Help build a map of Durga Puja Pandals by sharing
+          where you are.
+        </p>
+
+        {/* ------------------------------------------------ */}
+        {/* STEP 1: GET LOCATION                            */}
+        {/* ------------------------------------------------ */}
+
+        {state === "idle" && (
+          <button
+            onClick={getLocation}
+            style={{
+              width: "100%",
+              padding: "16px",
+              fontSize: "1rem",
+              cursor: "pointer",
+            }}
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
+            📍 I&apos;m Here
+          </button>
+        )}
+
+        {/* ------------------------------------------------ */}
+        {/* LOCATION LOADING                                */}
+        {/* ------------------------------------------------ */}
+
+        {state === "locating" && (
+          <div>
+            <p>Getting your location...</p>
+            <p
+              style={{
+                color: "#666",
+                fontSize: "0.9rem",
+              }}
+            >
+              This should only take a few seconds.
+            </p>
+          </div>
+        )}
+
+        {/* ------------------------------------------------ */}
+        {/* DUPLICATE CHECK                                 */}
+        {/* ------------------------------------------------ */}
+
+        {state === "checking" && (
+          <div>
+            <p>Checking nearby Pandals...</p>
+          </div>
+        )}
+
+        {/* ------------------------------------------------ */}
+        {/* NAME ENTRY                                      */}
+        {/* ------------------------------------------------ */}
+
+        {state === "naming" && (
+          <div>
+            {nearbyPandal && (
+              <div
+                style={{
+                  border: "1px solid #ddd",
+                  borderRadius: "12px",
+                  padding: "16px",
+                  marginBottom: "20px",
+                }}
+              >
+                <p
+                  style={{
+                    marginTop: 0,
+                    marginBottom: "8px",
+                  }}
+                >
+                  We found a Pandal about{" "}
+                  <strong>
+                    {Math.round(
+                      nearbyPandal.distance_meters
+                    )}{" "}
+                    m
+                  </strong>{" "}
+                  away:
+                </p>
+
+                <p
+                  style={{
+                    fontSize: "1.2rem",
+                    fontWeight: 600,
+                    marginBottom: "16px",
+                  }}
+                >
+                  {nearbyPandal.puja_name}
+                </p>
+
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "10px",
+                  }}
+                >
+                  <button
+                    onClick={confirmNearbyPandal}
+                    style={{
+                      flex: 1,
+                      padding: "12px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Yes, this one
+                  </button>
+
+                  <button
+                    onClick={chooseNewPandal}
+                    style={{
+                      flex: 1,
+                      padding: "12px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    No, new one
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <label
+              htmlFor="puja-name"
+              style={{
+                display: "block",
+                marginBottom: "8px",
+                fontWeight: 600,
+              }}
+            >
+              Puja name
+            </label>
+
+            <input
+              id="puja-name"
+              type="text"
+              value={pujaName}
+              onChange={(event) => {
+                setPujaName(event.target.value);
+                setErrorMessage("");
+              }}
+              placeholder="e.g. Barisha Club"
+              maxLength={200}
+              style={{
+                width: "100%",
+                padding: "14px",
+                fontSize: "1rem",
+                boxSizing: "border-box",
+                marginBottom: "12px",
+              }}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+
+            <button
+              onClick={submitPandal}
+              disabled={!pujaName.trim()}
+              style={{
+                width: "100%",
+                padding: "14px",
+                fontSize: "1rem",
+                cursor: pujaName.trim()
+                  ? "pointer"
+                  : "not-allowed",
+              }}
+            >
+              Submit Pandal
+            </button>
+
+            <button
+              onClick={reset}
+              style={{
+                width: "100%",
+                padding: "12px",
+                marginTop: "10px",
+                cursor: "pointer",
+              }}
+            >
+              Start over
+            </button>
+          </div>
+        )}
+
+        {/* ------------------------------------------------ */}
+        {/* SUBMITTING                                      */}
+        {/* ------------------------------------------------ */}
+
+        {state === "submitting" && (
+          <div>
+            <p>Submitting Pandal...</p>
+          </div>
+        )}
+
+        {/* ------------------------------------------------ */}
+        {/* SUCCESS                                         */}
+        {/* ------------------------------------------------ */}
+
+        {state === "success" && (
+          <div>
+            <div
+              style={{
+                padding: "20px",
+                borderRadius: "12px",
+                border: "1px solid #ddd",
+                marginBottom: "16px",
+              }}
+            >
+              <h2
+                style={{
+                  marginTop: 0,
+                }}
+              >
+                Thank you!
+              </h2>
+
+              <p>{message}</p>
+            </div>
+
+            <button
+              onClick={reset}
+              style={{
+                width: "100%",
+                padding: "14px",
+                cursor: "pointer",
+              }}
+            >
+              Add another Pandal
+            </button>
+          </div>
+        )}
+
+        {/* ------------------------------------------------ */}
+        {/* ERROR                                           */}
+        {/* ------------------------------------------------ */}
+
+        {state === "error" && (
+          <div>
+            <div
+              style={{
+                padding: "20px",
+                borderRadius: "12px",
+                border: "1px solid #ddd",
+                marginBottom: "16px",
+              }}
+            >
+              <h2
+                style={{
+                  marginTop: 0,
+                }}
+              >
+                Something went wrong
+              </h2>
+
+              <p>{errorMessage}</p>
+            </div>
+
+            <button
+              onClick={reset}
+              style={{
+                width: "100%",
+                padding: "14px",
+                cursor: "pointer",
+              }}
+            >
+              Try again
+            </button>
+          </div>
+        )}
+      </div>
+    </main>
   );
 }
