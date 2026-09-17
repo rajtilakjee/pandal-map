@@ -9,19 +9,11 @@ type LocationData = {
   accuracy: number;
 };
 
-type NearbyPandal = {
-  id: string;
-  puja_name: string;
-  latitude: number;
-  longitude: number;
-  distance_meters: number;
-};
+type LocationMode = "manual" | "live";
 
 type SubmissionState =
-  | "idle"
+  | "ready"
   | "locating"
-  | "checking"
-  | "naming"
   | "submitting"
   | "success"
   | "error";
@@ -77,76 +69,134 @@ function getErrorMessage(error: unknown): string {
 
 export default function Home() {
   const [state, setState] =
-    useState<SubmissionState>("idle");
+    useState<SubmissionState>("ready");
+
+  const [locationMode, setLocationMode] =
+    useState<LocationMode>("manual");
 
   const [location, setLocation] =
     useState<LocationData | null>(null);
 
-  const [nearbyPandal, setNearbyPandal] =
-    useState<NearbyPandal | null>(null);
+  const [pujaName, setPujaName] =
+    useState("");
 
-  const [pujaName, setPujaName] = useState("");
+  const [locationAddress, setLocationAddress] =
+    useState("");
 
-  const [message, setMessage] = useState("");
+  const [area, setArea] =
+    useState("");
 
-  const [errorMessage, setErrorMessage] = useState("");
+  const [nearestLandmark, setNearestLandmark] =
+    useState("");
 
-  const getLocation = () => {
-    setState("locating");
-    setMessage("");
+  const [message, setMessage] =
+    useState("");
+
+  const [errorMessage, setErrorMessage] =
+    useState("");
+
+  /*
+   * Switch between manual location and live location.
+   */
+  const handleLocationModeChange = (
+    mode: LocationMode
+  ) => {
+    setLocationMode(mode);
     setErrorMessage("");
-    setNearbyPandal(null);
+
+    if (mode === "manual") {
+      /*
+       * Clear GPS data when switching back
+       * to manual location.
+       */
+      setLocation(null);
+      setState("ready");
+      return;
+    }
+
+    /*
+     * Request location only after the user
+     * explicitly chooses live location.
+     */
+    getLiveLocation();
+  };
+
+  /*
+   * Get the user's live location.
+   */
+  const getLiveLocation = () => {
+    setState("locating");
+    setErrorMessage("");
 
     if (!navigator.geolocation) {
-      setState("error");
+      setLocationMode("manual");
+      setState("ready");
+
       setErrorMessage(
-        "Your browser does not support location services."
+        "Your browser does not support location services. You can enter the location manually instead."
       );
+
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
-      async (position) => {
+      (position) => {
         const locationData: LocationData = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
+          latitude:
+            position.coords.latitude,
+
+          longitude:
+            position.coords.longitude,
+
+          accuracy:
+            position.coords.accuracy,
         };
 
         setLocation(locationData);
-
-        await checkNearbyPandals(locationData);
+        setState("ready");
+        setErrorMessage("");
       },
-      (error) => {
-        console.error("Location error:", error);
 
-        setState("error");
+      (error) => {
+        console.error(
+          "Location error:",
+          error
+        );
+
+        /*
+         * Fall back to manual location if
+         * the user doesn't provide GPS access.
+         */
+        setLocationMode("manual");
+        setLocation(null);
+        setState("ready");
 
         switch (error.code) {
           case error.PERMISSION_DENIED:
             setErrorMessage(
-              "Location permission was denied. Please allow location access and try again."
+              "Location permission was denied. You can enter the location manually instead."
             );
             break;
 
           case error.POSITION_UNAVAILABLE:
             setErrorMessage(
-              "Your location could not be determined. Please try again."
+              "Your location could not be determined. You can enter the location manually instead."
             );
             break;
 
           case error.TIMEOUT:
             setErrorMessage(
-              "Location lookup took too long. Please try again."
+              "Location lookup took too long. You can enter the location manually instead."
             );
             break;
 
           default:
             setErrorMessage(
-              "Unable to get your location. Please try again."
+              "Unable to get your location. You can enter the location manually instead."
             );
         }
       },
+
       {
         enableHighAccuracy: false,
         maximumAge: 30000,
@@ -155,107 +205,150 @@ export default function Home() {
     );
   };
 
-  const checkNearbyPandals = async (
-    locationData: LocationData
-  ) => {
-    setState("checking");
-    setMessage("");
-    setErrorMessage("");
-
-    try {
-      const { data, error } = await supabase.rpc(
-        "find_nearby_pandals",
-        {
-          user_lat: locationData.latitude,
-          user_lng: locationData.longitude,
-          radius_meters: 50,
-        }
-      );
-
-      if (error) {
-        console.error(
-          "Nearby Pandal check failed:",
-          {
-            code: error.code,
-            message: error.message,
-            details: error.details,
-            hint: error.hint,
-          }
-        );
-
-        if (isRateLimitError(error)) {
-          setState("error");
-          setErrorMessage(
-            "You've checked locations too frequently. Please wait a few minutes and try again."
-          );
-          return;
-        }
-
-        console.warn(
-          "Duplicate detection failed. Continuing without it."
-        );
-
-        setNearbyPandal(null);
-        setState("naming");
-        return;
-      }
-
-      if (data && data.length > 0) {
-        setNearbyPandal(data[0]);
-        setState("naming");
-        return;
-      }
-
-      setNearbyPandal(null);
-      setState("naming");
-    } catch (error) {
-      console.error(
-        "Unexpected nearby check error:",
-        error
-      );
-
-      setNearbyPandal(null);
-      setState("naming");
-    }
-  };
-
+  /*
+   * Submit the Pandal.
+   */
   const submitPandal = async () => {
-    if (!location) {
-      setState("error");
-      setErrorMessage(
-        "Please capture your location first."
-      );
-      return;
-    }
+    setErrorMessage("");
+    setMessage("");
 
-    const trimmedName = pujaName.trim();
+    const trimmedName =
+      pujaName.trim();
 
+    const trimmedAddress =
+      locationAddress.trim();
+
+    const trimmedArea =
+      area.trim();
+
+    const trimmedLandmark =
+      nearestLandmark.trim();
+
+    /*
+     * Validate Pandal name.
+     */
     if (!trimmedName) {
-      setErrorMessage("Please enter the Puja name.");
+      setErrorMessage(
+        "Please enter the Pandal name."
+      );
+
       return;
     }
 
     if (trimmedName.length > 200) {
       setErrorMessage(
-        "The Puja name must be 200 characters or fewer."
+        "The Pandal name must be 200 characters or fewer."
       );
+
+      return;
+    }
+
+    /*
+     * Validate location.
+     */
+    if (locationMode === "live") {
+      if (!location) {
+        setErrorMessage(
+          "Please wait for your live location to be detected."
+        );
+
+        return;
+      }
+    } else {
+      if (!trimmedAddress) {
+        setErrorMessage(
+          "Please enter the location or address."
+        );
+
+        return;
+      }
+
+      if (!trimmedArea) {
+        setErrorMessage(
+          "Please enter the area."
+        );
+
+        return;
+      }
+
+      if (trimmedAddress.length > 500) {
+        setErrorMessage(
+          "The location or address must be 500 characters or fewer."
+        );
+
+        return;
+      }
+
+      if (trimmedArea.length > 100) {
+        setErrorMessage(
+          "The area must be 100 characters or fewer."
+        );
+
+        return;
+      }
+    }
+
+    /*
+     * Validate optional landmark.
+     */
+    if (trimmedLandmark.length > 200) {
+      setErrorMessage(
+        "The nearest landmark must be 200 characters or fewer."
+      );
+
       return;
     }
 
     setState("submitting");
-    setMessage("");
-    setErrorMessage("");
 
     try {
-      const { error } = await supabase
-        .from("pandal_submissions")
-        .insert({
-          puja_name: trimmedName,
-          latitude: location.latitude,
-          longitude: location.longitude,
-          accuracy: location.accuracy,
-          year: new Date().getFullYear(),
-        });
+      const submission = {
+        puja_name: trimmedName,
+
+        /*
+         * Live GPS data.
+         *
+         * Manual submissions receive null.
+         */
+        latitude:
+          locationMode === "live"
+            ? location?.latitude
+            : null,
+
+        longitude:
+          locationMode === "live"
+            ? location?.longitude
+            : null,
+
+        accuracy:
+          locationMode === "live"
+            ? location?.accuracy
+            : null,
+
+        /*
+         * Manual location data.
+         *
+         * Live submissions receive null.
+         */
+        location_address:
+          locationMode === "manual"
+            ? trimmedAddress
+            : null,
+
+        area:
+          trimmedArea || null,
+
+        nearest_landmark:
+          trimmedLandmark || null,
+
+        year:
+          new Date().getFullYear(),
+      };
+
+      const { error } =
+        await supabase
+          .from("pandal_submissions")
+          .insert(submission);
 
       if (error) {
         console.error(
@@ -268,26 +361,46 @@ export default function Home() {
           }
         );
 
+        /*
+         * Rate limit response.
+         */
         if (isRateLimitError(error)) {
           setState("error");
+
           setErrorMessage(
             "You've submitted several Pandals recently. Please try again later."
           );
+
           return;
         }
 
         setState("error");
-        setErrorMessage(getErrorMessage(error));
+
+        setErrorMessage(
+          getErrorMessage(error)
+        );
+
         return;
       }
 
+      /*
+       * Successful submission.
+       */
       setState("success");
 
       setMessage(
-        "Pandal submitted successfully. Thank you for contributing!"
+        "Your Pandal has been added. Thank you for contributing!"
       );
 
+      /*
+       * Clear the form.
+       */
       setPujaName("");
+      setLocationAddress("");
+      setArea("");
+      setNearestLandmark("");
+      setLocation(null);
+
     } catch (error) {
       console.error(
         "Unexpected submission error:",
@@ -296,68 +409,74 @@ export default function Home() {
 
       if (isRateLimitError(error)) {
         setState("error");
+
         setErrorMessage(
           "You've submitted several Pandals recently. Please try again later."
         );
+
         return;
       }
 
       setState("error");
+
       setErrorMessage(
         "Something went wrong while submitting. Please try again."
       );
     }
   };
 
-  const confirmNearbyPandal = () => {
-    if (!nearbyPandal) {
-      return;
-    }
-
-    setPujaName(nearbyPandal.puja_name);
-    setState("naming");
-    setErrorMessage("");
-  };
-
-  const chooseNewPandal = () => {
-    setNearbyPandal(null);
-    setPujaName("");
-    setState("naming");
-    setErrorMessage("");
-  };
-
+  /*
+   * Reset the form.
+   */
   const reset = () => {
-    setState("idle");
+    setState("ready");
+    setLocationMode("manual");
     setLocation(null);
-    setNearbyPandal(null);
     setPujaName("");
+    setLocationAddress("");
+    setArea("");
+    setNearestLandmark("");
     setMessage("");
     setErrorMessage("");
   };
 
+  const canSubmit =
+    pujaName.trim().length > 0 &&
+    (locationMode === "live"
+      ? location !== null
+      : locationAddress.trim().length > 0 &&
+        area.trim().length > 0);
+
   return (
     <main className="page">
+
       <div className="background-decoration decoration-one" />
+
       <div className="background-decoration decoration-two" />
 
       <div className="container">
+
         {/* Header */}
 
         <header className="header">
+
           <div className="logo-mark">
             <span>ॐ</span>
           </div>
 
           <div>
+
             <p className="eyebrow">
               DURGA PUJA • KOLKATA
             </p>
 
             <h1>
               Pandal
-              <span>MAP</span>
+              <span>GO</span>
             </h1>
+
           </div>
+
         </header>
 
         <p className="intro">
@@ -369,180 +488,12 @@ export default function Home() {
         {/* Main Card */}
 
         <section className="card">
-          {/* Idle */}
 
-          {state === "idle" && (
-            <div className="start-screen">
-              <div className="location-icon">
-                <span>⌖</span>
-              </div>
-
-              <h2>
-                Where are you?
-              </h2>
-
-              <p>
-                We&apos;ll use your location to find
-                nearby Pandals and add new ones to
-                the map.
-              </p>
-
-              <button
-                className="primary-button"
-                onClick={getLocation}
-              >
-                <span className="button-icon">
-                  📍
-                </span>
-
-                I&apos;m Here
-              </button>
-
-              <p className="privacy-note">
-                Your location is only used to find
-                nearby Pandals.
-              </p>
-            </div>
-          )}
-
-          {/* Locating */}
-
-          {state === "locating" && (
-            <div className="status-screen">
-              <div className="spinner" />
-
-              <h2>
-                Finding you...
-              </h2>
-
-              <p>
-                Getting your current location.
-              </p>
-            </div>
-          )}
-
-          {/* Checking */}
-
-          {state === "checking" && (
-            <div className="status-screen">
-              <div className="spinner" />
-
-              <h2>
-                Looking nearby...
-              </h2>
-
-              <p>
-                Checking whether someone has
-                already found this Pandal.
-              </p>
-            </div>
-          )}
-
-          {/* Naming */}
-
-          {state === "naming" && (
-            <div className="form-screen">
-              {nearbyPandal && (
-                <div className="nearby-card">
-                  <div className="nearby-label">
-                    PANDAL FOUND NEARBY
-                  </div>
-
-                  <h2>
-                    {nearbyPandal.puja_name}
-                  </h2>
-
-                  <p>
-                    About{" "}
-                    <strong>
-                      {Math.round(
-                        nearbyPandal.distance_meters
-                      )}{" "}
-                      m
-                    </strong>{" "}
-                    from your location
-                  </p>
-
-                  <div className="choice-buttons">
-                    <button
-                      className="secondary-button"
-                      onClick={confirmNearbyPandal}
-                    >
-                      ✓ Yes, this one
-                    </button>
-
-                    <button
-                      className="outline-button"
-                      onClick={chooseNewPandal}
-                    >
-                      No, new one
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <div className="form-group">
-                <label htmlFor="puja-name">
-                  Puja name
-                </label>
-
-                <input
-                  id="puja-name"
-                  type="text"
-                  value={pujaName}
-                  onChange={(event) => {
-                    setPujaName(
-                      event.target.value
-                    );
-                    setErrorMessage("");
-                  }}
-                  placeholder="e.g. Barisha Club"
-                  maxLength={200}
-                  autoComplete="off"
-                />
-
-                <div className="character-count">
-                  {pujaName.length}/200
-                </div>
-              </div>
-
-              <button
-                className="primary-button"
-                onClick={submitPandal}
-                disabled={!pujaName.trim()}
-              >
-                Add Pandal
-              </button>
-
-              <button
-                className="text-button"
-                onClick={reset}
-              >
-                ← Start over
-              </button>
-            </div>
-          )}
-
-          {/* Submitting */}
-
-          {state === "submitting" && (
-            <div className="status-screen">
-              <div className="spinner" />
-
-              <h2>
-                Adding Pandal...
-              </h2>
-
-              <p>
-                Just a moment.
-              </p>
-            </div>
-          )}
-
-          {/* Success */}
+          {/* SUCCESS */}
 
           {state === "success" && (
             <div className="success-screen">
+
               <div className="success-icon">
                 ✓
               </div>
@@ -565,13 +516,15 @@ export default function Home() {
               >
                 Add another Pandal
               </button>
+
             </div>
           )}
 
-          {/* Error */}
+          {/* ERROR */}
 
           {state === "error" && (
             <div className="error-screen">
+
               <div className="error-icon">
                 !
               </div>
@@ -590,13 +543,299 @@ export default function Home() {
               >
                 Try again
               </button>
+
             </div>
           )}
+
+          {/* FORM */}
+
+          {state !== "success" &&
+            state !== "error" && (
+
+            <div className="form-screen">
+
+              {/* PANDAL NAME */}
+
+              <div className="form-group">
+
+                <label htmlFor="puja-name">
+                  Pandal Name
+                  <span className="required">
+                    *
+                  </span>
+                </label>
+
+                <input
+                  id="puja-name"
+                  type="text"
+                  value={pujaName}
+                  onChange={(event) => {
+                    setPujaName(
+                      event.target.value
+                    );
+
+                    setErrorMessage("");
+                  }}
+                  placeholder="e.g. Barisha Club"
+                  maxLength={200}
+                  autoComplete="off"
+                />
+
+              </div>
+
+              {/* LOCATION */}
+
+              <div className="location-section">
+
+                <label className="section-label">
+                  Location
+                  <span className="required">
+                    *
+                  </span>
+                </label>
+
+                {/* LIVE LOCATION CHECKBOX */}
+
+                <label
+                  className={`live-location-option ${
+                    locationMode === "live"
+                      ? "active"
+                      : ""
+                  }`}
+                >
+
+                  <input
+                    type="checkbox"
+                    checked={
+                      locationMode === "live"
+                    }
+                    onChange={(event) => {
+                      handleLocationModeChange(
+                        event.target.checked
+                          ? "live"
+                          : "manual"
+                      );
+                    }}
+                  />
+
+                  <span className="custom-checkbox">
+                    {locationMode === "live" &&
+                      "✓"}
+                  </span>
+
+                  <span className="live-location-text">
+
+                    <strong>
+                      Add live location
+                    </strong>
+
+                    <small>
+                      Uses your device&apos;s
+                      current location
+                    </small>
+
+                  </span>
+
+                </label>
+
+                {/* GETTING LOCATION */}
+
+                {locationMode === "live" &&
+                  state === "locating" && (
+
+                  <div className="location-status">
+
+                    <div className="small-spinner" />
+
+                    <span>
+                      Getting your location...
+                    </span>
+
+                  </div>
+                )}
+
+                {/* LOCATION FOUND */}
+
+                {locationMode === "live" &&
+                  location &&
+                  state !== "locating" && (
+
+                  <div className="location-success">
+
+                    <span>
+                      ✓
+                    </span>
+
+                    <div>
+
+                      <strong>
+                        Live location added
+                      </strong>
+
+                      <small>
+                        Accuracy: approximately{" "}
+                        {Math.round(
+                          location.accuracy
+                        )}
+                        m
+                      </small>
+
+                    </div>
+
+                  </div>
+                )}
+
+                {/* MANUAL LOCATION */}
+
+                {locationMode === "manual" && (
+
+                  <div className="manual-location">
+
+                    {/* ADDRESS */}
+
+                    <div className="form-group">
+
+                      <label htmlFor="location-address">
+                        Location / Address
+                        <span className="required">
+                          *
+                        </span>
+                      </label>
+
+                      <textarea
+                        id="location-address"
+                        value={
+                          locationAddress
+                        }
+                        onChange={(event) => {
+                          setLocationAddress(
+                            event.target.value
+                          );
+
+                          setErrorMessage("");
+                        }}
+                        placeholder="e.g. 123, Diamond Harbour Road"
+                        maxLength={500}
+                        rows={3}
+                      />
+
+                      <div className="character-count textarea-count">
+                        {
+                          locationAddress.length
+                        }
+                        /500
+                      </div>
+
+                    </div>
+
+                    {/* AREA */}
+
+                    <div className="form-group">
+
+                      <label htmlFor="area">
+                        Area
+                        <span className="required">
+                          *
+                        </span>
+                      </label>
+
+                      <input
+                        id="area"
+                        type="text"
+                        value={area}
+                        onChange={(event) => {
+                          setArea(
+                            event.target.value
+                          );
+
+                          setErrorMessage("");
+                        }}
+                        placeholder="e.g. Barisha"
+                        maxLength={100}
+                        autoComplete="off"
+                      />
+
+                    </div>
+
+                  </div>
+                )}
+
+              </div>
+
+              {/* NEAREST LANDMARK */}
+
+              <div className="form-group">
+
+                <label htmlFor="landmark">
+
+                  Nearest Landmark
+
+                  <span className="optional">
+                    optional
+                  </span>
+
+                </label>
+
+                <input
+                  id="landmark"
+                  type="text"
+                  value={nearestLandmark}
+                  onChange={(event) => {
+                    setNearestLandmark(
+                      event.target.value
+                    );
+
+                    setErrorMessage("");
+                  }}
+                  placeholder="e.g. Near Deshapriya Park"
+                  maxLength={200}
+                  autoComplete="off"
+                />
+
+              </div>
+
+              {/* ERROR */}
+
+              {errorMessage && (
+
+                <div className="inline-error">
+                  {errorMessage}
+                </div>
+
+              )}
+
+              {/* SUBMIT */}
+
+              <button
+                className="primary-button"
+                onClick={submitPandal}
+                disabled={
+                  !canSubmit ||
+                  state === "submitting"
+                }
+              >
+                {state === "submitting"
+                  ? "Adding Pandal..."
+                  : "Submit Pandal"}
+              </button>
+
+              {/* PRIVACY */}
+
+              <p className="privacy-note">
+                Live location is optional.
+                You can enter the location
+                manually instead.
+              </p>
+
+            </div>
+          )}
+
         </section>
 
-        {/* Footer */}
+        {/* FOOTER */}
 
         <footer>
+
           <span>
             Made for the Puja season
           </span>
@@ -608,10 +847,13 @@ export default function Home() {
           <span>
             One Pandal at a time
           </span>
+
         </footer>
+
       </div>
 
       <style jsx>{`
+
         .page {
           min-height: 100vh;
           background: #f8f3e7;
@@ -633,7 +875,7 @@ export default function Home() {
 
         .container {
           width: 100%;
-          max-width: 500px;
+          max-width: 520px;
           position: relative;
           z-index: 2;
         }
@@ -681,7 +923,8 @@ export default function Home() {
           justify-content: center;
           font-size: 26px;
           box-shadow:
-            0 8px 24px rgba(8, 127, 123, 0.2);
+            0 8px 24px
+            rgba(8, 127, 123, 0.2);
         }
 
         .eyebrow {
@@ -717,47 +960,232 @@ export default function Home() {
           border-radius: 24px;
           padding: 30px;
           box-shadow:
-            0 20px 60px rgba(23, 59, 58, 0.08);
+            0 20px 60px
+            rgba(23, 59, 58, 0.08);
         }
 
-        .start-screen,
-        .status-screen,
-        .success-screen,
-        .error-screen {
-          text-align: center;
+        .form-group {
+          position: relative;
+          margin-bottom: 20px;
         }
 
-        .location-icon {
-          width: 72px;
-          height: 72px;
-          margin: 0 auto 20px;
-          border-radius: 22px;
-          background: #d9efec;
+        .form-group label,
+        .section-label {
+          display: block;
+          font-size: 13px;
+          font-weight: 700;
+          margin-bottom: 9px;
+        }
+
+        .required {
           color: #087f7b;
+          margin-left: 3px;
+        }
+
+        .optional {
+          color: #8a9693;
+          font-size: 10px;
+          font-weight: 500;
+          margin-left: 7px;
+        }
+
+        .form-group input,
+        .form-group textarea {
+          width: 100%;
+          box-sizing: border-box;
+          border: 1px solid #cbd9d5;
+          border-radius: 13px;
+          background: #fffdf7;
+          color: #173b3a;
+          font-size: 15px;
+          outline: none;
+          transition:
+            border 0.2s ease,
+            box-shadow 0.2s ease;
+          font-family: inherit;
+        }
+
+        .form-group input {
+          padding: 14px 15px;
+        }
+
+        .form-group textarea {
+          padding: 14px 15px;
+          resize: vertical;
+          min-height: 85px;
+          line-height: 1.5;
+        }
+
+        .form-group input::placeholder,
+        .form-group textarea::placeholder {
+          color: #9aa8a5;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+          border-color: #087f7b;
+          box-shadow:
+            0 0 0 3px
+            rgba(8, 127, 123, 0.1);
+        }
+
+        .character-count {
+          position: absolute;
+          right: 12px;
+          bottom: 14px;
+          color: #91a09d;
+          font-size: 10px;
+        }
+
+        .textarea-count {
+          bottom: 12px;
+        }
+
+        .location-section {
+          margin-bottom: 20px;
+        }
+
+        .live-location-option {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 15px;
+          border: 1px solid #cbd9d5;
+          border-radius: 14px;
+          cursor: pointer;
+          transition:
+            border 0.2s ease,
+            background 0.2s ease;
+          margin-bottom: 14px;
+        }
+
+        .live-location-option:hover {
+          border-color: #087f7b;
+        }
+
+        .live-location-option.active {
+          background: #d9efec;
+          border-color: #087f7b;
+        }
+
+        .live-location-option input {
+          position: absolute;
+          opacity: 0;
+          pointer-events: none;
+        }
+
+        .custom-checkbox {
+          width: 21px;
+          height: 21px;
+          border: 2px solid #9bbdb9;
+          border-radius: 6px;
+          background: #fffdf7;
+          color: #fffdf7;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 38px;
+          flex-shrink: 0;
+          font-size: 13px;
+          font-weight: 800;
         }
 
-        .start-screen h2,
-        .status-screen h2,
-        .success-screen h2,
-        .error-screen h2 {
-          margin: 0 0 10px;
-          font-size: 24px;
-          letter-spacing: -0.02em;
+        .live-location-option.active
+          .custom-checkbox {
+          background: #087f7b;
+          border-color: #087f7b;
         }
 
-        .start-screen p,
-        .status-screen p,
-        .success-screen p,
-        .error-screen p {
-          color: #667674;
+        .live-location-text {
+          display: flex;
+          flex-direction: column;
+          gap: 3px;
+        }
+
+        .live-location-text strong {
           font-size: 14px;
-          line-height: 1.6;
-          margin: 0 auto 24px;
-          max-width: 370px;
+        }
+
+        .live-location-text small {
+          color: #667674;
+          font-size: 11px;
+        }
+
+        .manual-location {
+          animation: fadeIn 0.2s ease;
+        }
+
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(-4px);
+          }
+
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .location-status {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 14px;
+          border-radius: 13px;
+          background: #f0f7f5;
+          color: #4e6967;
+          font-size: 13px;
+          margin-bottom: 14px;
+        }
+
+        .small-spinner {
+          width: 17px;
+          height: 17px;
+          border: 2px solid #b8ded9;
+          border-top-color: #087f7b;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+          flex-shrink: 0;
+        }
+
+        @keyframes spin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+
+        .location-success {
+          display: flex;
+          align-items: center;
+          gap: 11px;
+          padding: 14px;
+          border-radius: 13px;
+          background: #d9efec;
+          color: #075e5b;
+          margin-bottom: 14px;
+        }
+
+        .location-success > span {
+          width: 27px;
+          height: 27px;
+          border-radius: 50%;
+          background: #087f7b;
+          color: #fffdf7;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 800;
+        }
+
+        .location-success div {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        .location-success small {
+          color: #4e6967;
+          font-size: 11px;
         }
 
         .primary-button {
@@ -775,14 +1203,16 @@ export default function Home() {
             transform 0.2s ease,
             box-shadow 0.2s ease;
           box-shadow:
-            0 8px 20px rgba(8, 127, 123, 0.18);
+            0 8px 20px
+            rgba(8, 127, 123, 0.18);
         }
 
         .primary-button:hover:not(:disabled) {
           background: #075e5b;
           transform: translateY(-1px);
           box-shadow:
-            0 10px 24px rgba(8, 127, 123, 0.24);
+            0 10px 24px
+            rgba(8, 127, 123, 0.24);
         }
 
         .primary-button:active:not(:disabled) {
@@ -795,147 +1225,28 @@ export default function Home() {
           box-shadow: none;
         }
 
-        .button-icon {
-          margin-right: 8px;
-        }
-
-        .privacy-note {
-          font-size: 11px !important;
-          margin-top: 14px !important;
-          margin-bottom: 0 !important;
-          color: #8a9693 !important;
-        }
-
-        .spinner {
-          width: 42px;
-          height: 42px;
-          border: 3px solid #d9efec;
-          border-top-color: #087f7b;
-          border-radius: 50%;
-          margin: 10px auto 22px;
-          animation: spin 0.8s linear infinite;
-        }
-
-        @keyframes spin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-
-        .nearby-card {
-          background: #d9efec;
-          border: 1px solid #b8ded9;
-          border-radius: 18px;
-          padding: 20px;
-          margin-bottom: 24px;
-        }
-
-        .nearby-label {
-          color: #087f7b;
-          font-size: 10px;
-          font-weight: 800;
-          letter-spacing: 0.13em;
-          margin-bottom: 9px;
-        }
-
-        .nearby-card h2 {
-          margin: 0 0 7px;
-          font-size: 20px;
-          color: #075e5b;
-        }
-
-        .nearby-card p {
-          margin: 0 0 18px;
-          color: #4e6967;
+        .inline-error {
+          background: #f9ead1;
+          border: 1px solid #ead2a5;
+          color: #765f2b;
+          border-radius: 12px;
+          padding: 12px 14px;
           font-size: 13px;
-        }
-
-        .choice-buttons {
-          display: flex;
-          gap: 10px;
-        }
-
-        .secondary-button,
-        .outline-button {
-          flex: 1;
-          padding: 12px;
-          border-radius: 11px;
-          font-size: 13px;
-          font-weight: 700;
-          cursor: pointer;
-        }
-
-        .secondary-button {
-          border: 1px solid #087f7b;
-          background: #087f7b;
-          color: #fffdf7;
-        }
-
-        .outline-button {
-          border: 1px solid #9bbdb9;
-          background: #fffdf7;
-          color: #075e5b;
-        }
-
-        .form-group {
-          position: relative;
+          line-height: 1.45;
           margin-bottom: 14px;
         }
 
-        .form-group label {
-          display: block;
-          font-size: 13px;
-          font-weight: 700;
-          margin-bottom: 8px;
+        .privacy-note {
+          text-align: center;
+          font-size: 11px;
+          color: #8a9693;
+          line-height: 1.5;
+          margin: 14px 0 0;
         }
 
-        .form-group input {
-          width: 100%;
-          box-sizing: border-box;
-          padding: 15px 48px 15px 15px;
-          border: 1px solid #cbd9d5;
-          border-radius: 13px;
-          background: #fffdf7;
-          color: #173b3a;
-          font-size: 15px;
-          outline: none;
-          transition:
-            border 0.2s ease,
-            box-shadow 0.2s ease;
-        }
-
-        .form-group input::placeholder {
-          color: #9aa8a5;
-        }
-
-        .form-group input:focus {
-          border-color: #087f7b;
-          box-shadow:
-            0 0 0 3px rgba(8, 127, 123, 0.1);
-        }
-
-        .character-count {
-          position: absolute;
-          right: 12px;
-          bottom: 14px;
-          color: #91a09d;
-          font-size: 10px;
-        }
-
-        .text-button {
-          display: block;
-          width: 100%;
-          margin-top: 14px;
-          border: 0;
-          background: transparent;
-          color: #667674;
-          font-size: 13px;
-          cursor: pointer;
-          padding: 8px;
-        }
-
-        .text-button:hover {
-          color: #087f7b;
+        .success-screen,
+        .error-screen {
+          text-align: center;
         }
 
         .success-icon {
@@ -951,7 +1262,8 @@ export default function Home() {
           font-size: 30px;
           font-weight: 700;
           box-shadow:
-            0 10px 25px rgba(8, 127, 123, 0.2);
+            0 10px 25px
+            rgba(8, 127, 123, 0.2);
         }
 
         .success-label {
@@ -960,6 +1272,21 @@ export default function Home() {
           font-weight: 800;
           letter-spacing: 0.14em;
           margin-bottom: 9px;
+        }
+
+        .success-screen h2,
+        .error-screen h2 {
+          margin: 0 0 10px;
+          font-size: 24px;
+        }
+
+        .success-screen p,
+        .error-screen p {
+          color: #667674;
+          font-size: 14px;
+          line-height: 1.6;
+          margin: 0 auto 24px;
+          max-width: 370px;
         }
 
         .error-icon {
@@ -991,10 +1318,11 @@ export default function Home() {
         }
 
         @media (max-width: 520px) {
+
           .page {
             padding: 24px 15px;
             align-items: flex-start;
-            padding-top: 45px;
+            padding-top: 35px;
           }
 
           .card {
@@ -1010,11 +1338,10 @@ export default function Home() {
             margin-left: 0;
           }
 
-          .choice-buttons {
-            flex-direction: column;
-          }
         }
+
       `}</style>
+
     </main>
   );
 }
